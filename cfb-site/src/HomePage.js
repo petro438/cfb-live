@@ -123,19 +123,19 @@ function HomePage() {
     }
   };
 
-  // Normalize classification values from database
   const normalizeClassification = (classification) => {
-    if (!classification) return 'Unknown';
-    
-    const normalized = classification.toLowerCase().trim();
-    
-    if (normalized === 'fbs' || normalized === 'division i fbs') return 'FBS';
-    if (normalized === 'fcs' || normalized === 'division i fcs') return 'FCS';
-    if (normalized === 'd2' || normalized === 'division ii') return 'D2';
-    if (normalized === 'd3' || normalized === 'division iii') return 'D3';
-    
-    return 'Unknown';
-  };
+  if (!classification) return 'Unknown';
+  
+  const normalized = classification.toLowerCase().trim();
+  
+  if (normalized === 'fbs' || normalized === 'division i fbs') return 'FBS';
+  if (normalized === 'fcs' || normalized === 'division i fcs') return 'FCS';
+  if (normalized === 'd2' || normalized === 'division ii') return 'D2';
+  if (normalized === 'd3' || normalized === 'division iii') return 'D3';
+  
+  // 🔧 FIX: Return uppercase version of what we received
+  return normalized.toUpperCase();
+};
 
   // Helper function to get classification breakdown for debugging
   const getClassificationBreakdown = (teams) => {

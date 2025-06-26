@@ -1120,7 +1120,7 @@ app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, r
     
   } catch (err) {
     console.error('❌ Error in enhanced SOS calculation:', err);
-    res.status500.json({ 
+    res.status(500).json({ 
       error: 'Internal server error',
       details: err.message 
     });
@@ -2145,14 +2145,6 @@ app.get('/', (req, res) => {
       'GET /api/leaderboards/luck/:season'
     ]
   });
-});
-
-// Serve static files from the React app build directory
-app.use(express.static(path.join(__dirname, 'build')));
-
-// Catch all handler: send back React's index.html file for any non-API routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 app.listen(port, () => {

@@ -1274,13 +1274,14 @@ if (game.home_moneyline && game.away_moneyline) {
   );
 
   // Main Component
-  function TeamPage() {
-    console.log('🚀 TeamPage component rendered');
-    
-    const { teamName } = useParams();
-    console.log('🎯 Team name from URL:', teamName);
-    
-    const [teamData, setTeamData] = useState(null);
+function TeamPage() {
+  console.log('🚀 TeamPage component rendered');
+  
+  const { teamName } = useParams();
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'; // ADD THIS LINE
+  console.log('🎯 Team name from URL:', teamName);
+  
+  const [teamData, setTeamData] = useState(null);
     const [games, setGames] = useState([]);
     const [stats, setStats] = useState(null);
     const [allTeamsAdvancedStats, setAllTeamsAdvancedStats] = useState(null);
@@ -1301,28 +1302,23 @@ const loadTeamData = async () => {
   try {
     setLoading(true);
     
-  const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
-  // ✅ This endpoint exists
-  fetch(`http://localhost:5000/api/teams/${encodeURIComponent(teamName)}?year=2024`),
-  
-  // ✅ FIXED: Use the games-enhanced endpoint that exists in your server.js
-  fetch(`http://localhost:5000/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`),
-  
-  // ✅ This endpoint exists
-  fetch(`http://localhost:5000/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
-  
-  // ✅ This endpoint exists
-  fetch(`http://localhost:5000/api/all-advanced-stats/2024`),
-  
-  // ✅ ADD: Rankings for opponent ranks
-  fetch(`http://localhost:5000/api/power-rankings?year=2024`)
-]);
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+    // 🔧 FIX: Add Promise.all and assign to variables
+    const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
+      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?year=2024`),
+      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`),
+      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
+      fetch(`${API_URL}/api/all-advanced-stats/2024`),
+      fetch(`${API_URL}/api/power-rankings?year=2024`)
+    ]);
 
     console.log('📊 API responses:', {
       team: teamResponse.ok,
       games: gamesResponse.ok,
       stats: statsResponse.ok,
-      allAdvanced: allAdvancedStatsResponse.ok
+      allAdvanced: allAdvancedStatsResponse.ok,
+      rankings: rankingsResponse.ok
     });
 
     if (!teamResponse.ok) {
@@ -1331,7 +1327,7 @@ const loadTeamData = async () => {
 
     const team = await teamResponse.json();
     
-    // FIXED: Handle the games-enhanced response (it returns a direct array)
+    // Handle the games-enhanced response (it returns a direct array)
     let games = [];
     if (gamesResponse.ok) {
       games = await gamesResponse.json(); // This is already an array
@@ -1351,23 +1347,16 @@ const loadTeamData = async () => {
     });
 
     const rankingsData = rankingsResponse.ok ? await rankingsResponse.json() : null;
-console.log('🎯 Full rankings data:', rankingsData);
+    console.log('🎯 Full rankings data:', rankingsData);
 
-// FIXED: Extract the teams array from the object
-const rankings = rankingsData?.teams || rankingsData || [];
-console.log('🏈 Rankings array length:', rankings.length);
-console.log('🏈 Sample team from rankings:', rankings?.[0]);
-if (rankings && rankings.length > 0) {
-  console.log('🔑 Available keys in first ranking:', Object.keys(rankings[0]));
-}
-setAllTeamsRankings(rankings);
-
-console.log('🔍 Parsed data:', {
-  team: !!team,
-  gamesCount: games.length,
-  stats: !!stats,
-  allAdvancedStatsCount: allAdvancedStats ? allAdvancedStats.length : 0
-});
+    // Extract the teams array from the object
+    const rankings = rankingsData?.teams || rankingsData || [];
+    console.log('🏈 Rankings array length:', rankings.length);
+    console.log('🏈 Sample team from rankings:', rankings?.[0]);
+    if (rankings && rankings.length > 0) {
+      console.log('🔑 Available keys in first ranking:', Object.keys(rankings[0]));
+    }
+    setAllTeamsRankings(rankings);
 
     // Convert string numbers to actual numbers
     const processedTeam = {

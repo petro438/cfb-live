@@ -40,12 +40,15 @@ function HomePage() {
   const [availableYears, setAvailableYears] = useState([]);
   const [selectedClassification, setSelectedClassification] = useState('FBS'); // 'FBS', 'FCS', 'All'
 
-  // Fetch available years
+  // Get API URL based on environment
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+  // Fetch available years - FIXED
   useEffect(() => {
     const fetchAvailableYears = async () => {
       try {
-        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-        fetch(`${API_URL}/api/leaderboards/passing/${season}?${params}`)
+        const response = await fetch(`${API_URL}/api/available-years`);
+        if (!response.ok) throw new Error('Failed to fetch years');
         const data = await response.json();
         setAvailableYears(data.years || []);
         
@@ -60,7 +63,7 @@ function HomePage() {
     };
 
     fetchAvailableYears();
-  }, []);
+  }, [API_URL]);
 
   // Load data from database with year parameter
   const loadDatabaseData = async () => {
@@ -69,9 +72,8 @@ function HomePage() {
       setError(null);
       
       console.log(`🔄 Loading data for year: ${selectedYear}`);
-      console.log(`🌐 Making request to: http://localhost:5000/api/power-rankings?year=${selectedYear}`);
       
-      const response = await fetch(`http://localhost:5000/api/power-rankings?year=${selectedYear}`);
+      const response = await fetch(`${API_URL}/api/power-rankings?year=${selectedYear}`);
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status} - ${response.statusText}`);
@@ -98,7 +100,7 @@ function HomePage() {
         defenseRating: Number(team.defense_rating) || 0,
         strengthOfSchedule: Number(team.strength_of_schedule) || 0,
         conference: team.conference || 'Unknown',
-        logo: team.logo || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
+        logo: team.logo_url || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
         abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
         season: team.season || selectedYear,
         // Rankings come pre-calculated from the database
@@ -132,10 +134,6 @@ function HomePage() {
     if (normalized === 'd2' || normalized === 'division ii') return 'D2';
     if (normalized === 'd3' || normalized === 'division iii') return 'D3';
     
-    // Default fallback - assume FBS for major conferences
-    const majorConferences = ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Pac-12', 'American', 'Mountain West', 'Conference USA', 'MAC', 'Sun Belt'];
-    // This would need the team's conference, but for now we'll return unknown
-    
     return 'Unknown';
   };
 
@@ -148,12 +146,6 @@ function HomePage() {
     });
     return breakdown;
   };
-
-  // DEBUG: Log when selectedYear changes
-  useEffect(() => {
-    console.log(`🎯 selectedYear changed to: ${selectedYear}`);
-    console.log(`📱 Current availableYears:`, availableYears);
-  }, [selectedYear]);
 
   // Load data when year changes
   useEffect(() => {
@@ -184,15 +176,10 @@ function HomePage() {
       const teamClassification = team.classification;
       const matches = teamClassification === selectedClassification;
       
-      if (!matches) {
-        console.log(`❌ ${team.teamName}: ${teamClassification} !== ${selectedClassification}`);
-      }
-      
       return matches;
     });
     
     console.log(`✅ Teams after ${selectedClassification} filter: ${filtered.length}`);
-    console.log(`📋 Classification breakdown:`, getClassificationBreakdown(filtered));
     
     return filtered;
   }, [allTeams, selectedClassification]);
@@ -221,7 +208,7 @@ function HomePage() {
     setSelectedConference('All Teams');
   }, [selectedClassification]);
 
-  // 🔧 FIXED: Calculate rankings based on scope (conference vs national/classification)
+  // Calculate rankings based on scope (conference vs national/classification)
   const rankedData = useMemo(() => {
     if (filteredTeams.length === 0) return [];
     
@@ -290,7 +277,7 @@ function HomePage() {
     }
   };
 
-  // 🔧 FIXED: Get the total count for percentile calculations based on ranking scope
+  // Get the total count for percentile calculations based on ranking scope
   const totalForPercentiles = useMemo(() => {
     if (rankingScope === 'conference' && selectedConference !== 'All Teams') {
       // Conference mode: use only teams in the selected conference
@@ -536,7 +523,7 @@ function HomePage() {
         )}
       </div>
 
-      {/* 🔧 UPDATED: Ranking Scope Toggle (only show when conference is selected) */}
+      {/* Ranking Scope Toggle (only show when conference is selected) */}
       {selectedConference !== 'All Teams' && (
         <div style={{
           display: 'flex',

@@ -2150,6 +2150,37 @@ app.get('/', (req, res) => {
   });
 });
 
+// Add this endpoint to check table structure
+app.get('/api/debug-table-structure', async (req, res) => {
+  try {
+    // Check team_power_ratings columns
+    const columnsQuery = await pool.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns 
+      WHERE table_name = 'team_power_ratings'
+      ORDER BY ordinal_position
+    `);
+    
+    // Get sample data
+    const sampleQuery = await pool.query(`
+      SELECT * FROM team_power_ratings LIMIT 3
+    `);
+    
+    res.json({
+      table: 'team_power_ratings',
+      columns: columnsQuery.rows,
+      sample_data: sampleQuery.rows,
+      column_names: columnsQuery.rows.map(col => col.column_name)
+    });
+    
+  } catch (err) {
+    res.status(500).json({ 
+      error: err.message,
+      code: err.code 
+    });
+  }
+});
+
 app.listen(port, () => {
   console.log(`CFB API server running on port ${port}`);
   console.log(`Database: ${process.env.DB_NAME || process.env.DB_DATABASE}`);

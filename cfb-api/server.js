@@ -11,18 +11,21 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection
+// PostgreSQL connection - USES DATABASE_URL ONLY
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Test database connection
+// Test database connection - FIXED to work with DATABASE_URL
 pool.connect((err, client, release) => {
   if (err) {
     console.error('Error connecting to PostgreSQL:', err);
   } else {
-    console.log(`Connected to PostgreSQL database: ${process.env.DB_NAME || process.env.DB_DATABASE}`);
+    // Extract database name from DATABASE_URL for logging
+    const dbName = process.env.DATABASE_URL ? 
+      process.env.DATABASE_URL.split('/').pop().split('?')[0] : 'Unknown';
+    console.log(`Connected to PostgreSQL database: ${dbName}`);
     release();
   }
 });

@@ -8,7 +8,13 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://cfbsite-production.up.railway.app',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // PostgreSQL connection - USES DATABASE_URL ONLY
@@ -2150,7 +2156,7 @@ app.get('/', (req, res) => {
   });
 });
 
-javascript// Debug endpoint to check table structure
+// Debug endpoint to check table structure
 app.get('/api/debug-columns', async (req, res) => {
   try {
     // Check what columns exist in team_power_ratings

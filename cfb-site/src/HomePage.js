@@ -43,7 +43,7 @@ function HomePage() {
   // Get API URL based on environment
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  // Fetch available years - FIXED
+  // Fetch available years
   useEffect(() => {
     const fetchAvailableYears = async () => {
       try {
@@ -65,85 +65,84 @@ function HomePage() {
     fetchAvailableYears();
   }, [API_URL]);
 
-  // Replace the useEffect around line 152 in your HomePage.js with this:
-
-useEffect(() => {
-  const loadDatabaseData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log(`🔄 Loading data for year: ${selectedYear}`);
-      
-      const response = await fetch(`${API_URL}/api/power-rankings?year=${selectedYear}`);
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} - ${response.statusText}`);
+  // Load database data when year changes
+  useEffect(() => {
+    const loadDatabaseData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log(`🔄 Loading data for year: ${selectedYear}`);
+        
+        const response = await fetch(`${API_URL}/api/power-rankings?year=${selectedYear}`);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} - ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log(`📊 API Response for ${selectedYear}:`, {
+          type: Array.isArray(result) ? 'array' : 'object',
+          season: result.season,
+          teamCount: Array.isArray(result) ? result.length : result.teams?.length,
+          firstTeam: Array.isArray(result) ? result[0] : result.teams?.[0]
+        });
+        
+        // Handle both old format (array) and new format (object with teams array)
+        const data = Array.isArray(result) ? result : result.teams || [];
+        
+        console.log(`📈 Processing ${data.length} teams for ${selectedYear}`);
+        
+        // Process the data to match our component structure
+        const processedTeams = data.map(team => ({
+          teamName: team.team_name,
+          powerRating: Number(team.power_rating) || 0,
+          offenseRating: Number(team.offense_rating) || 0,
+          defenseRating: Number(team.defense_rating) || 0,
+          strengthOfSchedule: Number(team.strength_of_schedule) || 0,
+          conference: team.conference || 'Unknown',
+          logo: team.logo_url || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
+          abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
+          season: team.season || selectedYear,
+          // Rankings come pre-calculated from the database
+          powerRank: Number(team.power_rank) || 0,
+          offenseRank: Number(team.offense_rank) || 0,
+          defenseRank: Number(team.defense_rank) || 0,
+          sosRank: Number(team.sos_rank) || 0,
+          // Use the classification from the database directly
+          classification: normalizeClassification(team.classification)
+        }));
+        
+        console.log(`✅ Processed teams by classification:`, getClassificationBreakdown(processedTeams));
+        
+        setAllTeams(processedTeams);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error loading database data:', err);
+        setError(`Failed to load data from database: ${err.message}`);
+        setLoading(false);
       }
-      
-      const result = await response.json();
-      console.log(`📊 API Response for ${selectedYear}:`, {
-        type: Array.isArray(result) ? 'array' : 'object',
-        season: result.season,
-        teamCount: Array.isArray(result) ? result.length : result.teams?.length,
-        firstTeam: Array.isArray(result) ? result[0] : result.teams?.[0]
-      });
-      
-      // Handle both old format (array) and new format (object with teams array)
-      const data = Array.isArray(result) ? result : result.teams || [];
-      
-      console.log(`📈 Processing ${data.length} teams for ${selectedYear}`);
-      
-      // Process the data to match our component structure
-      const processedTeams = data.map(team => ({
-        teamName: team.team_name,
-        powerRating: Number(team.power_rating) || 0,
-        offenseRating: Number(team.offense_rating) || 0,
-        defenseRating: Number(team.defense_rating) || 0,
-        strengthOfSchedule: Number(team.strength_of_schedule) || 0,
-        conference: team.conference || 'Unknown',
-        logo: team.logo_url || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
-        abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
-        season: team.season || selectedYear,
-        // Rankings come pre-calculated from the database
-        powerRank: Number(team.power_rank) || 0,
-        offenseRank: Number(team.offense_rank) || 0,
-        defenseRank: Number(team.defense_rank) || 0,
-        sosRank: Number(team.sos_rank) || 0,
-        // Use the classification from the database directly
-        classification: normalizeClassification(team.classification)
-      }));
-      
-      console.log(`✅ Processed teams by classification:`, getClassificationBreakdown(processedTeams));
-      
-      setAllTeams(processedTeams);
-      setLoading(false);
-    } catch (err) {
-      console.error('Error loading database data:', err);
-      setError(`Failed to load data from database: ${err.message}`);
-      setLoading(false);
-    }
-  };
+    };
 
-  console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
-  if (selectedYear) {
-    loadDatabaseData();
-  }
-}, [selectedYear, API_URL]); // Remove loadDatabaseData from dependencies
+    console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
+    if (selectedYear) {
+      loadDatabaseData();
+    }
+  }, [selectedYear, API_URL]);
 
   const normalizeClassification = (classification) => {
-  if (!classification) return 'Unknown';
-  
-  const normalized = classification.toLowerCase().trim();
-  
-  if (normalized === 'fbs' || normalized === 'division i fbs') return 'FBS';
-  if (normalized === 'fcs' || normalized === 'division i fcs') return 'FCS';
-  if (normalized === 'd2' || normalized === 'division ii') return 'D2';
-  if (normalized === 'd3' || normalized === 'division iii') return 'D3';
-  
-  // 🔧 FIX: Return uppercase version of what we received
-  return normalized.toUpperCase();
-};
+    if (!classification) return 'Unknown';
+    
+    const normalized = classification.toLowerCase().trim();
+    
+    if (normalized === 'fbs' || normalized === 'division i fbs') return 'FBS';
+    if (normalized === 'fcs' || normalized === 'division i fcs') return 'FCS';
+    if (normalized === 'd2' || normalized === 'division ii') return 'D2';
+    if (normalized === 'd3' || normalized === 'division iii') return 'D3';
+    
+    // 🔧 FIX: Return uppercase version of what we received
+    return normalized.toUpperCase();
+  };
 
   // Helper function to get classification breakdown for debugging
   const getClassificationBreakdown = (teams) => {
@@ -155,12 +154,12 @@ useEffect(() => {
     return breakdown;
   };
 
+  // Reset ranking scope when changing conferences
   useEffect(() => {
-  console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
-  if (selectedYear) {
-    loadDatabaseData();
-  }
-}, [selectedYear, loadDatabaseData]); // ✅ Added loadDatabaseData to deps
+    if (selectedConference === 'All Teams') {
+      setRankingScope('national');
+    }
+  }, [selectedConference]);
 
   // Reset ranking scope when changing conferences
   useEffect(() => {
@@ -355,7 +354,7 @@ useEffect(() => {
         <div>{error}</div>
         <div style={{ marginTop: '10px' }}>
           <button 
-            onClick={() => loadDatabaseData()}
+            onClick={() => window.location.reload()}
             style={{
               padding: '8px 16px',
               backgroundColor: '#28a745',

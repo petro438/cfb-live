@@ -113,103 +113,107 @@ const SOSLeaderboard = () => {
   const [selectedClassification, setSelectedClassification] = useState('fbs');
   const [availableSeasons] = useState(['2024', '2025']);
   
-  useEffect(() => {
-  fetchSOSData();
-    }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification, fetchSOSData]); // ✅ add fetchSOSData
+  // Replace your entire useEffect and fetchSOSData section with this:
 
-
-  const fetchSOSData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const baseUrl = `http://localhost:5000/api/leaderboards/strength-of-schedule-enhanced/${selectedSeason}`;
-      const url = new URL(baseUrl);
-      
-      if (conferenceGamesOnly) {
-        url.searchParams.append('conferenceOnly', 'true');
-      }
-      
-      if (!regularSeasonOnly) {
-        url.searchParams.append('includePostseason', 'true');
-      }
-      
-      if (selectedClassification !== 'all') {
-        url.searchParams.append('classification', selectedClassification);
-      }
-      
-      console.log('🔍 Fetching SOS data:', url.toString());
-      
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      
-      if (data.teams && Array.isArray(data.teams)) {
-        // Create additional rankings
-        const teamsWithRankings = [...data.teams];
-        
-        // Power rating ranking
-        teamsWithRankings.sort((a, b) => parseFloat(b.team_rating) - parseFloat(a.team_rating));
-        teamsWithRankings.forEach((team, index) => {
-          team.power_rating_rank = index + 1;
-        });
-        
-        // Projected wins ranking
-        teamsWithRankings.sort((a, b) => parseFloat(b.projected_wins) - parseFloat(a.projected_wins));
-        teamsWithRankings.forEach((team, index) => {
-          team.projected_wins_rank = index + 1;
-        });
-        
-        // Win difference ranking (actual wins - projected wins, higher is better)
-        teamsWithRankings.forEach(team => {
-          team.win_difference = team.actual_wins - parseFloat(team.projected_wins);
-        });
-        teamsWithRankings.sort((a, b) => b.win_difference - a.win_difference);
-        teamsWithRankings.forEach((team, index) => {
-          team.win_difference_rank = index + 1;
-        });
-        
-        // Restore original SOS order
-        const finalTeams = data.teams.map(team => {
-          const teamWithRankings = teamsWithRankings.find(t => t.team === team.team);
-          return {
-            ...team,
-            power_rating_rank: teamWithRankings?.power_rating_rank || 1,
-            projected_wins_rank: teamWithRankings?.projected_wins_rank || 1,
-            win_difference: teamWithRankings?.win_difference || 0,
-            win_difference_rank: teamWithRankings?.win_difference_rank || 1
-          };
-        });
-        
-        // DEBUG: Check for duplicate Troy/Charlotte entries
-        console.log('🐛 Raw API data count:', data.teams.length);
-        console.log('🐛 Final teams count:', finalTeams.length);
-        console.log('🐛 Troy/Charlotte in raw data:', data.teams.filter(t => 
-          t.team && (t.team.includes('Troy') || t.team.includes('Charlotte'))
-        ));
-        console.log('🐛 Troy/Charlotte in final data:', finalTeams.filter(t => 
-          t.team && (t.team.includes('Troy') || t.team.includes('Charlotte'))
-        ));
-        
-        setSOSData(finalTeams);
-        setMetadata(data.metadata);
-        
-        const uniqueConferences = [...new Set(finalTeams.map(team => team.conference))].filter(c => c).sort();
-        setConferences(uniqueConferences);
-        
-        console.log(`✅ Loaded ${finalTeams.length} teams for ${selectedSeason} (${selectedClassification})`);
-      } else {
-        throw new Error('API returned unexpected format');
-      }
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching SOS data:', err);
-    } finally {
-      setLoading(false);
+const fetchSOSData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Use environment variable for API URL
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const baseUrl = `${API_URL}/api/leaderboards/strength-of-schedule-enhanced/${selectedSeason}`;
+    const url = new URL(baseUrl);
+    
+    if (conferenceGamesOnly) {
+      url.searchParams.append('conferenceOnly', 'true');
     }
-  };
+    
+    if (!regularSeasonOnly) {
+      url.searchParams.append('includePostseason', 'true');
+    }
+    
+    if (selectedClassification !== 'all') {
+      url.searchParams.append('classification', selectedClassification);
+    }
+    
+    console.log('🔍 Fetching SOS data:', url.toString());
+    
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    
+    if (data.teams && Array.isArray(data.teams)) {
+      // Create additional rankings
+      const teamsWithRankings = [...data.teams];
+      
+      // Power rating ranking
+      teamsWithRankings.sort((a, b) => parseFloat(b.team_rating) - parseFloat(a.team_rating));
+      teamsWithRankings.forEach((team, index) => {
+        team.power_rating_rank = index + 1;
+      });
+      
+      // Projected wins ranking
+      teamsWithRankings.sort((a, b) => parseFloat(b.projected_wins) - parseFloat(a.projected_wins));
+      teamsWithRankings.forEach((team, index) => {
+        team.projected_wins_rank = index + 1;
+      });
+      
+      // Win difference ranking (actual wins - projected wins, higher is better)
+      teamsWithRankings.forEach(team => {
+        team.win_difference = team.actual_wins - parseFloat(team.projected_wins);
+      });
+      teamsWithRankings.sort((a, b) => b.win_difference - a.win_difference);
+      teamsWithRankings.forEach((team, index) => {
+        team.win_difference_rank = index + 1;
+      });
+      
+      // Restore original SOS order
+      const finalTeams = data.teams.map(team => {
+        const teamWithRankings = teamsWithRankings.find(t => t.team === team.team);
+        return {
+          ...team,
+          power_rating_rank: teamWithRankings?.power_rating_rank || 1,
+          projected_wins_rank: teamWithRankings?.projected_wins_rank || 1,
+          win_difference: teamWithRankings?.win_difference || 0,
+          win_difference_rank: teamWithRankings?.win_difference_rank || 1
+        };
+      });
+      
+      // DEBUG: Check for duplicate Troy/Charlotte entries
+      console.log('🐛 Raw API data count:', data.teams.length);
+      console.log('🐛 Final teams count:', finalTeams.length);
+      console.log('🐛 Troy/Charlotte in raw data:', data.teams.filter(t => 
+        t.team && (t.team.includes('Troy') || t.team.includes('Charlotte'))
+      ));
+      console.log('🐛 Troy/Charlotte in final data:', finalTeams.filter(t => 
+        t.team && (t.team.includes('Troy') || t.team.includes('Charlotte'))
+      ));
+      
+      setSOSData(finalTeams);
+      setMetadata(data.metadata);
+      
+      const uniqueConferences = [...new Set(finalTeams.map(team => team.conference))].filter(c => c).sort();
+      setConferences(uniqueConferences);
+      
+      console.log(`✅ Loaded ${finalTeams.length} teams for ${selectedSeason} (${selectedClassification})`);
+    } else {
+      throw new Error('API returned unexpected format');
+    }
+  } catch (err) {
+    setError(err.message);
+    console.error('Error fetching SOS data:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Move useEffect AFTER the function definition
+useEffect(() => {
+  fetchSOSData();
+}, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification]); // Remove fetchSOSData from dependencies
 
   const handleSort = (key) => {
     let direction = 'asc';

@@ -1297,14 +1297,15 @@ function TeamPage() {
 
    // Replace your loadTeamData function in TeamPage.js with this fixed version:
 
+// Replace the useEffect and loadTeamData section in your TeamPage.js with this:
+
+// Move loadTeamData function BEFORE useEffect
 const loadTeamData = async () => {
   console.log('📡 Starting API calls for:', teamName);
   
   try {
     setLoading(true);
     
-    // const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
     // Make all API calls in parallel
     const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
       fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?year=2024`),
@@ -1382,6 +1383,14 @@ const loadTeamData = async () => {
     setLoading(false);
   }
 };
+
+// Move useEffect AFTER the function definition
+useEffect(() => {
+  console.log('🔄 useEffect triggered for teamName:', teamName);
+  if (teamName) {
+    loadTeamData();
+  }
+}, [teamName]); // Remove loadTeamData from dependencies
 
     if (loading) {
       return (

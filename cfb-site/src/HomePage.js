@@ -65,7 +65,9 @@ function HomePage() {
     fetchAvailableYears();
   }, [API_URL]);
 
-  // Load data from database with year parameter
+  // Replace the useEffect around line 152 in your HomePage.js with this:
+
+useEffect(() => {
   const loadDatabaseData = async () => {
     try {
       setLoading(true);
@@ -122,6 +124,12 @@ function HomePage() {
       setLoading(false);
     }
   };
+
+  console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
+  if (selectedYear) {
+    loadDatabaseData();
+  }
+}, [selectedYear, API_URL]); // Remove loadDatabaseData from dependencies
 
   const normalizeClassification = (classification) => {
   if (!classification) return 'Unknown';

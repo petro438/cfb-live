@@ -63,32 +63,42 @@ const PassingStatsPage = () => {
     );
   };
 
-  const loadPassingStats = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        conference_only: conferenceOnly.toString(),
-        regular_season_only: regularSeasonOnly.toString(),
-        side: side,
-        per_game: perGame.toString()
-      });
-      
-      if (conference !== 'all') {
-        params.append('conference', conference);
-      }
+  // Replace the useEffect and loadPassingStats section in your PassingStatsPage.js with this:
 
-      const response = await fetch(`https://your-api-url.railway.app/api/leaderboards/passing/${season}?${params}`)
-      const result = await response.json();
-      
-      if (result.teams) {
-        setData(result.teams);
-      }
-    } catch (error) {
-      console.error('Error loading passing stats:', error);
-    } finally {
-      setLoading(false);
+// Move loadPassingStats function BEFORE useEffect
+const loadPassingStats = async () => {
+  setLoading(true);
+  try {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    
+    const params = new URLSearchParams({
+      conference_only: conferenceOnly.toString(),
+      regular_season_only: regularSeasonOnly.toString(),
+      side: side,
+      per_game: perGame.toString()
+    });
+    
+    if (conference !== 'all') {
+      params.append('conference', conference);
     }
-  };
+
+    const response = await fetch(`${API_URL}/api/leaderboards/passing/${season}?${params}`);
+    const result = await response.json();
+    
+    if (result.teams) {
+      setData(result.teams);
+    }
+  } catch (error) {
+    console.error('Error loading passing stats:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Move useEffect AFTER the function definition
+useEffect(() => {
+  loadPassingStats();
+}, [season, conference, conferenceOnly, regularSeasonOnly, side, perGame]); // Remove loadPassingStats from dependencies
 
   useEffect(() => {
    loadPassingStats();

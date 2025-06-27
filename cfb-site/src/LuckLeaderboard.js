@@ -17,41 +17,51 @@ const LuckLeaderboard = () => {
     }, [selectedSeason, conferenceFilter, conferenceOnlyGames, regularSeasonOnly, fetchLuckData]); // ✅ Added fetchLuckData
 
 
-  const fetchLuckData = async () => {
-    try {
-      setLoading(true);
-      
-      const params = new URLSearchParams({
-        includePostseason: (!regularSeasonOnly).toString(),
-        conferenceOnly: conferenceOnlyGames.toString()
-      });
-      
-      if (conferenceFilter !== 'all') {
-        params.append('conference', conferenceFilter);
-      }
-      
-      const response = await fetch(`http://localhost:5000/api/leaderboards/luck/${selectedSeason}?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch luck data: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const teamsData = data.teams || [];
-      
-      // Extract unique conferences
-      const uniqueConferences = [...new Set(teamsData.map(team => team.conference))].sort();
-      setConferences(uniqueConferences);
-      
-      setTeams(teamsData);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching luck data:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  // Replace the useEffect and fetchLuckData section in your LuckLeaderboard.js with this:
+
+// Move fetchLuckData function BEFORE useEffect
+const fetchLuckData = async () => {
+  try {
+    setLoading(true);
+    
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    
+    const params = new URLSearchParams({
+      includePostseason: (!regularSeasonOnly).toString(),
+      conferenceOnly: conferenceOnlyGames.toString()
+    });
+    
+    if (conferenceFilter !== 'all') {
+      params.append('conference', conferenceFilter);
     }
-  };
+    
+    const response = await fetch(`${API_URL}/api/leaderboards/luck/${selectedSeason}?${params}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch luck data: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const teamsData = data.teams || [];
+    
+    // Extract unique conferences
+    const uniqueConferences = [...new Set(teamsData.map(team => team.conference))].sort();
+    setConferences(uniqueConferences);
+    
+    setTeams(teamsData);
+    setError(null);
+  } catch (err) {
+    console.error('Error fetching luck data:', err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Move useEffect AFTER the function definition
+useEffect(() => {
+  fetchLuckData();
+}, [selectedSeason, conferenceFilter, conferenceOnlyGames, regularSeasonOnly]); // Remove fetchLuckData from dependencies
 
   // Sorting function
   const handleSort = (column) => {

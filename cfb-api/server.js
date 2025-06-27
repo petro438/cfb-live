@@ -52,7 +52,7 @@ function normalCDF(x, mean = 0, stdDev = 1) {
 app.get('/api/power-rankings', async (req, res) => {
   try {
     // Get year from query parameter, default to 2025
-    const year = parseInt(req.query.year) || 2025;
+    const season = parseInt(req.query.season) || 2025;
     
     console.log(`Fetching power rankings for ${year} season`);
     
@@ -211,7 +211,7 @@ app.get('/api/teams/:teamName', async (req, res) => {
   try {
     // Decode URL encoding (Ohio%20State -> Ohio State)
     const teamName = decodeURIComponent(req.params.teamName);
-    const year = parseInt(req.query.year) || 2025;
+    const season = parseInt(req.query.season) || 2025;
     
     console.log(`🔍 Looking for team: "${teamName}" for ${year} season`);
     
@@ -271,8 +271,7 @@ app.get('/api/teams/:teamName/stats', async (req, res) => {
   try {
     // Decode URL encoding
     const teamName = decodeURIComponent(req.params.teamName);
-    const { season } = req.query;
-    const seasonFilter = season || 2024;
+    const season = parseInt(req.query.season) || 2024;
     
     console.log(`🔍 Fetching stats for: "${teamName}", season ${seasonFilter}`);
     
@@ -444,8 +443,7 @@ app.get('/api/teams/:teamName/stats', async (req, res) => {
 app.get('/api/teams/:teamName/games', async (req, res) => {
   try {
     const { teamName } = req.params;
-    const { season, year } = req.query;
-    const seasonParam = season || year || '2025';
+    const season = parseInt(req.query.season) || 2024;
     
     console.log(`🏈 Getting games for team: "${teamName}", season: ${seasonParam}`);
     
@@ -1573,7 +1571,7 @@ app.get('/api/debug-teams-table', async (req, res) => {
 // 🔧 DEBUG: Check JOIN effectiveness  
 app.get('/api/debug-join', async (req, res) => {
   try {
-    const year = parseInt(req.query.year) || 2025;
+    const season = parseInt(req.query.season) || 2024;
     
     const result = await pool.query(`
       SELECT 

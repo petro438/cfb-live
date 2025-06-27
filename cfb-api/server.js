@@ -68,37 +68,25 @@ app.get('/api/power-rankings', async (req, res) => {
     console.log('Sample teams with classifications:', debugQuery.rows);
 
     const result = await pool.query(`
-      SELECT DISTINCT ON (tpr.team_name)
-        tpr.team_name,
-        tpr.power_rating,
-        tpr.offense_rating,
-        tpr.defense_rating,
-        tpr.strength_of_schedule,
-        tpr.season,
-        t.school,
-        t.mascot,
-        t.conference,
-        t.classification,
-        t.logo_url,
-        t.color,
-        t.alt_color
-      FROM team_power_ratings tpr
-      LEFT JOIN teams t ON (
-        LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name)) OR
-        LOWER(TRIM(t.mascot)) = LOWER(TRIM(tpr.team_name)) OR
-        LOWER(TRIM(CONCAT(t.school, ' ', t.mascot))) = LOWER(TRIM(tpr.team_name))
-      )
-      WHERE tpr.power_rating IS NOT NULL 
-        AND tpr.season = $1
-      ORDER BY tpr.team_name, tpr.power_rating DESC
-    `, [year]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: `No power rankings found for ${year} season`,
-        availableYears: await getAvailableYears(pool)
-      });
-    }
+  SELECT 
+    tpr.team_name,
+    tpr.power_rating,
+    tpr.offense_rating,
+    tpr.defense_rating,
+    tpr.season,
+    t.school,
+    t.mascot,
+    t.conference,
+    t.classification,
+    t.logo_url,
+    t.color,
+    t.alt_color
+  FROM team_power_ratings tpr
+  LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name))
+  WHERE tpr.power_rating IS NOT NULL 
+    AND tpr.season = $1
+  ORDER BY tpr.power_rating DESC
+`, [year]);
     
     // Calculate rankings after deduplication
     const sortedByPower = [...result.rows].sort((a, b) => b.power_rating - a.power_rating);

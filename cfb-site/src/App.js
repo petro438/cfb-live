@@ -6,10 +6,6 @@ import SOSLeaderboard from './SOSLeaderboard';
 import LuckLeaderboard from './LuckLeaderboard';
 import PassingStatsPage from './PassingStatsPage';
 
-function TeamPage() {
-  console.log('🚀 TEAMPAGE LOADED - SUCCESS!'); // Add this line first
-  console.log('🚀 TeamPage component rendered');
-
 function App() {
   return (
     <Router>

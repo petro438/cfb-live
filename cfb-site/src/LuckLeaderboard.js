@@ -14,7 +14,8 @@ const LuckLeaderboard = () => {
 
   useEffect(() => {
     fetchLuckData();
-  }, [selectedSeason, conferenceFilter, conferenceOnlyGames, regularSeasonOnly]);
+    }, [selectedSeason, conferenceFilter, conferenceOnlyGames, regularSeasonOnly, fetchLuckData]); // ✅ Added fetchLuckData
+
 
   const fetchLuckData = async () => {
     try {

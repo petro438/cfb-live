@@ -1290,9 +1290,10 @@ function TeamPage() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-      console.log('🔄 useEffect triggered for teamName:', teamName);
-      loadTeamData();
-    }, [teamName]);
+    console.log('🔄 useEffect triggered for teamName:', teamName);
+    loadTeamData();
+    }, [teamName, loadTeamData]); // ✅ add loadTeamData
+
 
    // Replace your loadTeamData function in TeamPage.js with this fixed version:
 
@@ -1302,7 +1303,7 @@ const loadTeamData = async () => {
   try {
     setLoading(true);
     
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    // const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
     // Make all API calls in parallel
     const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([

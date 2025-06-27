@@ -44,18 +44,18 @@ const getRankColor = (rank, totalTeams = 134, isHigherBetter = true) => {
 };
 
 // Helper function for backwards compatibility with StatCell
-const getPercentileColor = (rank, totalTeams, isHigherBetter = true) => {
-  return getRankColor(rank, totalTeams, isHigherBetter).bg;
-};
+// const getPercentileColor = (rank, totalTeams, isHigherBetter = true) => {
+  // return getRankColor(rank, totalTeams, isHigherBetter).bg;
+// };
 
-const getTextColor = (bgColor) => {
-  const color = bgColor.replace('#', '');
-  const r = parseInt(color.substr(0, 2), 16);
-  const g = parseInt(color.substr(2, 2), 16);
-  const b = parseInt(color.substr(4, 2), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000000' : '#ffffff';
-};
+// const getTextColor = (bgColor) => {
+  // const color = bgColor.replace('#', '');
+  // const r = parseInt(color.substr(0, 2), 16);
+  // const g = parseInt(color.substr(2, 2), 16);
+  // const b = parseInt(color.substr(4, 2), 16);
+  // const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  // return luminance > 0.5 ? '#000000' : '#ffffff';
+//};
 
 // StatCell component for colored values
 const StatCell = ({ value, rank, isHigherBetter = true, totalForPercentiles, showRank = false }) => {
@@ -114,8 +114,9 @@ const SOSLeaderboard = () => {
   const [availableSeasons] = useState(['2024', '2025']);
   
   useEffect(() => {
-    fetchSOSData();
-  }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification]);
+  fetchSOSData();
+    }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification, fetchSOSData]); // ✅ add fetchSOSData
+
 
   const fetchSOSData = async () => {
     try {

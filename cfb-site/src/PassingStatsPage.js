@@ -91,8 +91,9 @@ const PassingStatsPage = () => {
   };
 
   useEffect(() => {
-    loadPassingStats();
-  }, [season, conference, conferenceOnly, regularSeasonOnly, side, perGame]);
+   loadPassingStats();
+    }, [season, conference, conferenceOnly, regularSeasonOnly, side, perGame, loadPassingStats]); // ✅ Added loadPassingStats
+
 
   const handleSort = (field) => {
     if (sortField === field) {

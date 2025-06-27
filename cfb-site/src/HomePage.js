@@ -147,13 +147,12 @@ function HomePage() {
     return breakdown;
   };
 
-  // Load data when year changes
   useEffect(() => {
-    console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
-    if (selectedYear) {
-      loadDatabaseData();
-    }
-  }, [selectedYear]);
+  console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
+  if (selectedYear) {
+    loadDatabaseData();
+  }
+}, [selectedYear, loadDatabaseData]); // ✅ Added loadDatabaseData to deps
 
   // Reset ranking scope when changing conferences
   useEffect(() => {

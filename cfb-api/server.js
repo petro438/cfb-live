@@ -2150,33 +2150,32 @@ app.get('/', (req, res) => {
   });
 });
 
-// Add this endpoint to check table structure
-app.get('/api/debug-table-structure', async (req, res) => {
+javascript// Debug endpoint to check table structure
+app.get('/api/debug-columns', async (req, res) => {
   try {
-    // Check team_power_ratings columns
-    const columnsQuery = await pool.query(`
-      SELECT column_name, data_type, is_nullable
+    // Check what columns exist in team_power_ratings
+    const columns = await pool.query(`
+      SELECT column_name, data_type 
       FROM information_schema.columns 
       WHERE table_name = 'team_power_ratings'
       ORDER BY ordinal_position
     `);
     
-    // Get sample data
-    const sampleQuery = await pool.query(`
-      SELECT * FROM team_power_ratings LIMIT 3
-    `);
+    // Get a sample row to see actual data
+    const sample = await pool.query('SELECT * FROM team_power_ratings LIMIT 1');
     
     res.json({
-      table: 'team_power_ratings',
-      columns: columnsQuery.rows,
-      sample_data: sampleQuery.rows,
-      column_names: columnsQuery.rows.map(col => col.column_name)
+      columns: columns.rows.map(col => col.column_name),
+      column_details: columns.rows,
+      sample_row: sample.rows[0] || null,
+      has_season_column: columns.rows.some(col => col.column_name === 'season'),
+      has_year_column: columns.rows.some(col => col.column_name === 'year')
     });
     
   } catch (err) {
-    res.status(500).json({ 
+    res.json({ 
       error: err.message,
-      code: err.code 
+      code: err.code
     });
   }
 });

@@ -1304,7 +1304,7 @@ const loadTeamData = async () => {
     
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-    // 🔧 FIX: Add Promise.all and assign to variables
+    // Make all API calls in parallel
     const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
       fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?year=2024`),
       fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`),
@@ -1327,10 +1327,10 @@ const loadTeamData = async () => {
 
     const team = await teamResponse.json();
     
-    // Handle the games-enhanced response (it returns a direct array)
+    // Handle the games-enhanced response
     let games = [];
     if (gamesResponse.ok) {
-      games = await gamesResponse.json(); // This is already an array
+      games = await gamesResponse.json();
       console.log(`🏈 Loaded ${games.length} enhanced games`);
     } else {
       console.log('❌ Enhanced games response not ok:', gamesResponse.status);
@@ -1339,23 +1339,12 @@ const loadTeamData = async () => {
     const stats = statsResponse.ok ? await statsResponse.json() : null;
     const allAdvancedStats = allAdvancedStatsResponse.ok ? await allAdvancedStatsResponse.json() : null;
 
-    console.log('🔍 Parsed data:', {
-      team: !!team,
-      gamesCount: games.length,
-      stats: !!stats,
-      allAdvancedStatsCount: allAdvancedStats ? allAdvancedStats.length : 0
-    });
-
     const rankingsData = rankingsResponse.ok ? await rankingsResponse.json() : null;
     console.log('🎯 Full rankings data:', rankingsData);
 
     // Extract the teams array from the object
     const rankings = rankingsData?.teams || rankingsData || [];
     console.log('🏈 Rankings array length:', rankings.length);
-    console.log('🏈 Sample team from rankings:', rankings?.[0]);
-    if (rankings && rankings.length > 0) {
-      console.log('🔑 Available keys in first ranking:', Object.keys(rankings[0]));
-    }
     setAllTeamsRankings(rankings);
 
     // Convert string numbers to actual numbers
@@ -1380,7 +1369,7 @@ const loadTeamData = async () => {
     } : null;
 
     setTeamData(processedTeam);
-    setGames(games); // Now this should be the enhanced games with betting data
+    setGames(games);
     setStats(processedStats);
     setAllTeamsAdvancedStats(allAdvancedStats);
     setLoading(false);

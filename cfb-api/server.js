@@ -786,7 +786,6 @@ app.get('/api/debug-columns', async (req, res) => {
       column_details: columns.rows,
       sample_row: sample.rows[0] || null,
       has_season_column: columns.rows.some(col => col.column_name === 'season'),
-      has_year_column: columns.rows.some(col => col.column_name === 'year')
     });
     
   } catch (err) {

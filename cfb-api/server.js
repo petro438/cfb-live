@@ -796,6 +796,10 @@ app.get('/api/debug-columns', async (req, res) => {
   }
 });
 
+app.get('/api/debug-games/:teamName', async (req, res) => {
+  // ... (use the code from the artifact above)
+});
+
 // Default route
 app.get('/', (req, res) => {
   res.json({

@@ -1449,31 +1449,6 @@ function TeamPage() {
     </div>
   );
 
-  // Temporary Debug Component
-  const GamesDebugInfo = ({ games }) => {
-    if (!games) return <div>Games is null/undefined</div>;
-    if (!Array.isArray(games)) return <div>Games is not an array: {typeof games}</div>;
-    
-    return (
-      <div style={{ 
-        backgroundColor: '#f0f0f0', 
-        padding: '10px', 
-        margin: '10px 0',
-        borderRadius: '4px',
-        fontFamily: 'monospace'
-      }}>
-        <strong>🐛 DEBUG INFO:</strong><br/>
-        Games array length: {games.length}<br/>
-        {games.length > 0 && (
-          <>
-            First game keys: {Object.keys(games[0]).join(', ')}<br/>
-            First game: {JSON.stringify(games[0], null, 2).substring(0, 200)}...
-          </>
-        )}
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div style={{ 
@@ -1572,9 +1547,6 @@ function TeamPage() {
             <StatCard title="Defense Rating" value={teamData.defense_rating?.toFixed(1) || 'N/A'} rank={teamData.defense_rank} />
           </div>
         </div>
-
-        {/* DEBUG INFO - Temporary */}
-        <GamesDebugInfo games={games} />
 
         {/* Completed Games */}
         <div style={{ marginBottom: '30px' }}>

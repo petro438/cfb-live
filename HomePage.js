@@ -35,53 +35,53 @@ function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Year and classification filters
-  const [selectedYear, setSelectedYear] = useState(2025);
-  const [availableYears, setAvailableYears] = useState([]);
+  // Season and classification filters
+  const [selectedSeason, setSelectedSeason] = useState(2025);
+  const [availableSeasons, setAvailableSeasons] = useState([]);
   const [selectedClassification, setSelectedClassification] = useState('FBS'); // 'FBS', 'FCS', 'All'
 
   // Get API URL based on environment
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  // Fetch available years
+  // Fetch available seasons
   useEffect(() => {
-    const fetchAvailableYears = async () => {
+    const fetchAvailableSeasons = async () => {
       try {
         const response = await fetch(`${API_URL}/api/available-seasons`);
-        if (!response.ok) throw new Error('Failed to fetch years');
+        if (!response.ok) throw new Error('Failed to fetch seasons');
         const data = await response.json();
-        setAvailableYears(data.seasons || []);
+        setAvailableSeasons(data.seasons || []);
         
-        // Set the most recent year as default if available
+        // Set the most recent season as default if available
         if (data.seasons && data.seasons.length > 0) {
-          setSelectedYear(data.seasons[0]); // First item should be most recent due to ORDER BY DESC
+          setSelectedSeason(data.seasons[0]); // First item should be most recent due to ORDER BY DESC
         }
       } catch (err) {
-        console.error('Error fetching available years:', err);
-        setAvailableYears([2024, 2025]); // Fallback
+        console.error('Error fetching available seasons:', err);
+        setAvailableSeasons([2024, 2025]); // Fallback
       }
     };
 
-    fetchAvailableYears();
+    fetchAvailableSeasons();
   }, [API_URL]);
 
-  // Load database data when year changes
+  // Load database data when season changes
   useEffect(() => {
     const loadDatabaseData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        console.log(`🔄 Loading data for season: ${selectedYear}`);
+        console.log(`🔄 Loading data for season: ${selectedSeason}`);
         
-        const response = await fetch(`${API_URL}/api/power-rankings?season=${selectedYear}`);
+        const response = await fetch(`${API_URL}/api/power-rankings?season=${selectedSeason}`);
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status} - ${response.statusText}`);
         }
         
         const result = await response.json();
-        console.log(`📊 API Response for ${selectedYear}:`, {
+        console.log(`📊 API Response for ${selectedSeason}:`, {
           type: Array.isArray(result) ? 'array' : 'object',
           season: result.season,
           teamCount: Array.isArray(result) ? result.length : result.teams?.length,
@@ -91,7 +91,7 @@ function HomePage() {
         // Handle both old format (array) and new format (object with teams array)
         const data = Array.isArray(result) ? result : result.teams || [];
         
-        console.log(`📈 Processing ${data.length} teams for ${selectedYear}`);
+        console.log(`📈 Processing ${data.length} teams for ${selectedSeason}`);
         
         // Process the data to match our component structure
         const processedTeams = data.map(team => ({
@@ -103,7 +103,7 @@ function HomePage() {
           conference: team.conference || 'Unknown',
           logo: team.logo_url || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
           abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
-          season: team.season || selectedYear,
+          season: team.season || selectedSeason,
           // Rankings come pre-calculated from the database
           powerRank: Number(team.power_rank) || 0,
           offenseRank: Number(team.offense_rank) || 0,
@@ -124,11 +124,11 @@ function HomePage() {
       }
     };
 
-    console.log(`🔄 useEffect triggered - selectedYear: ${selectedYear}`);
-    if (selectedYear) {
+    console.log(`🔄 useEffect triggered - selectedSeason: ${selectedSeason}`);
+    if (selectedSeason) {
       loadDatabaseData();
     }
-  }, [selectedYear, API_URL]);
+  }, [selectedSeason, API_URL]);
 
   const normalizeClassification = (classification) => {
     if (!classification) return 'Unknown';
@@ -335,7 +335,7 @@ function HomePage() {
         minHeight: '100vh',
         fontFamily: 'Trebuchet MS'
       }}>
-        <div>Loading {selectedYear} season data...</div>
+        <div>Loading {selectedSeason} season data...</div>
       </div>
     );
   }
@@ -400,7 +400,7 @@ function HomePage() {
         </p>
       </div>
 
-      {/* Year and Classification Filters */}
+      {/* Season and Classification Filters */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
@@ -413,7 +413,7 @@ function HomePage() {
         borderRadius: '4px',
         border: '1px solid #dee2e6'
       }}>
-        {/* Year Selector */}
+        {/* Season Selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <label style={{
             fontFamily: 'Trebuchet MS',
@@ -424,8 +424,8 @@ function HomePage() {
             Season:
           </label>
           <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            value={selectedSeason}
+            onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
             style={{
               fontFamily: 'Trebuchet MS',
               fontSize: '14px',
@@ -437,8 +437,8 @@ function HomePage() {
               minWidth: '80px'
             }}
           >
-            {availableYears.map(year => (
-              <option key={year} value={year}>{year}</option>
+            {availableSeasons.map(season => (
+              <option key={season} value={season}>{season}</option>
             ))}
           </select>
         </div>
@@ -590,8 +590,8 @@ function HomePage() {
         fontFamily: 'Trebuchet MS'
       }}>
         {selectedConference === 'All Teams' 
-          ? `Showing ${rankedData.length} ${selectedClassification} teams from ${selectedYear} season`
-          : `Showing ${rankedData.length} ${selectedClassification} teams in ${selectedConference} from ${selectedYear} season (${rankingScope === 'conference' ? 'conference rankings' : `${selectedClassification} rankings`})`
+          ? `Showing ${rankedData.length} ${selectedClassification} teams from ${selectedSeason} season`
+          : `Showing ${rankedData.length} ${selectedClassification} teams in ${selectedConference} from ${selectedSeason} season (${rankingScope === 'conference' ? 'conference rankings' : `${selectedClassification} rankings`})`
         }
       </div>
       
@@ -728,7 +728,7 @@ function HomePage() {
                         lineHeight: '1.2',
                         cursor: 'pointer',
                         color: '#007bff'
-                      }} onClick={() => window.location.href = `/team/${encodeURIComponent(team.teamName)}?season=${selectedYear}`}>
+                      }} onClick={() => window.location.href = `/team/${encodeURIComponent(team.teamName)}?season=${selectedSeason}`}>
                         {team.teamName}
                       </div>
                         <div style={{ 

@@ -1290,28 +1290,29 @@ function TeamPage() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-      console.log('🔄 useEffect triggered for teamName:', teamName);
-      loadTeamData();
-    }, [teamName]);
+    console.log('🔄 useEffect triggered for teamName:', teamName);
+    loadTeamData();
+    }, [teamName, loadTeamData]); // ✅ add loadTeamData
+
 
    // Replace your loadTeamData function in TeamPage.js with this fixed version:
 
+// Replace the useEffect and loadTeamData section in your TeamPage.js with this:
+
+// Move loadTeamData function BEFORE useEffect
 const loadTeamData = async () => {
   console.log('📡 Starting API calls for:', teamName);
   
   try {
     setLoading(true);
     
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-    // Make all API calls in parallel
-    const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
-      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?year=2024`),
-      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`),
-      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
-      fetch(`${API_URL}/api/all-advanced-stats/2024`),
-      fetch(`${API_URL}/api/power-rankings?year=2024`)
-    ]);
+   const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
+  fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?season=2025`),  // ✅ FIXED
+  fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`),
+  fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
+  fetch(`${API_URL}/api/all-advanced-stats/2024`),
+  fetch(`${API_URL}/api/power-rankings?season=2025`)  // ✅ FIXED
+]);
 
     console.log('📊 API responses:', {
       team: teamResponse.ok,
@@ -1381,6 +1382,14 @@ const loadTeamData = async () => {
     setLoading(false);
   }
 };
+
+// Move useEffect AFTER the function definition
+useEffect(() => {
+  console.log('🔄 useEffect triggered for teamName:', teamName);
+  if (teamName) {
+    loadTeamData();
+  }
+}, [teamName]); // Remove loadTeamData from dependencies
 
     if (loading) {
       return (

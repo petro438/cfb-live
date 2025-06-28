@@ -490,8 +490,7 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
-// 1. FIRST - Replace your games-enhanced endpoint in server.js with this SIMPLIFIED version:
-
+// Replace your games-enhanced endpoint in server.js with this version:
 app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
   try {
     const teamName = decodeURIComponent(req.params.teamName);
@@ -514,7 +513,7 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
     const actualTeamName = teamResult.rows[0].school;
     console.log(`✅ Found team: "${actualTeamName}"`);
     
-    // SIMPLIFIED QUERY - just get the essential data that we know exists
+    // Enhanced query with PPA data and betting lines
     const result = await pool.query(`
       SELECT 
         g.id,
@@ -540,13 +539,27 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
         END as home_away,
         
         -- Get opponent logo from teams table
-        t_opp.logo_url as opponent_logo
+        t_opp.logo_url as opponent_logo,
+        
+        -- Get betting lines (check if these tables exist)
+        bl.home_moneyline,
+        bl.away_moneyline,
+        bl.spread,
+        bl.provider as betting_provider,
+        
+        -- Get PPA data from advanced_game_stats
+        ags.offense_ppa,
+        ags.defense_ppa
         
       FROM games g
       LEFT JOIN teams t_opp ON LOWER(TRIM(t_opp.school)) = LOWER(TRIM(CASE 
         WHEN g.home_team = $1 THEN g.away_team
         ELSE g.home_team
       END))
+      LEFT JOIN game_betting_lines bl ON g.id = bl.game_id 
+        AND UPPER(TRIM(bl.provider)) IN ('DRAFTKINGS', 'ESPN BET')
+      LEFT JOIN advanced_game_stats ags ON g.id = ags.game_id 
+        AND LOWER(TRIM(ags.team)) = LOWER(TRIM($1))
       
       WHERE (g.home_team = $1 OR g.away_team = $1) 
         AND g.season = $2
@@ -554,29 +567,210 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
       ORDER BY g.week
     `, [actualTeamName, season]);
     
-    console.log(`✅ Found ${result.rows.length} games for ${actualTeamName} in ${season}`);
+    console.log(`✅ Found ${result.rows.length} enhanced games for ${actualTeamName} in ${season}`);
     
-    // Add the missing fields that your frontend expects (set defaults for now)
-    const processedGames = result.rows.map(game => ({
-      ...game,
-      // Add betting data as null for now (we'll add this back later)
-      home_moneyline: null,
-      away_moneyline: null,
-      spread: null,
-      betting_provider: null,
-      // Add PPA data as null for now 
-      offense_ppa: null,
-      defense_ppa: null
-    }));
-    
-    res.json(processedGames);
+    // If the enhanced query fails due to missing tables, fall back to basic query
+    if (result.rows.length === 0) {
+      console.log(`⚠️ No enhanced games found, trying basic query...`);
+      
+      const basicResult = await pool.query(`
+        SELECT 
+          g.id,
+          g.season,
+          g.week,
+          g.start_date,
+          g.home_team,
+          g.away_team,
+          g.home_points,
+          g.away_points,
+          g.completed,
+          g.home_postgame_win_probability,
+          g.away_postgame_win_probability,
+          g.season_type,
+          
+          CASE 
+            WHEN g.home_team = $1 THEN g.away_team
+            ELSE g.home_team
+          END as opponent,
+          CASE 
+            WHEN g.home_team = $1 THEN 'home'
+            ELSE 'away'
+          END as home_away,
+          
+          -- Get opponent logo from teams table
+          t_opp.logo_url as opponent_logo,
+          
+          -- Set nulls for missing data
+          NULL as home_moneyline,
+          NULL as away_moneyline,
+          NULL as spread,
+          NULL as betting_provider,
+          NULL as offense_ppa,
+          NULL as defense_ppa
+          
+        FROM games g
+        LEFT JOIN teams t_opp ON LOWER(TRIM(t_opp.school)) = LOWER(TRIM(CASE 
+          WHEN g.home_team = $1 THEN g.away_team
+          ELSE g.home_team
+        END))
+        
+        WHERE (g.home_team = $1 OR g.away_team = $1) 
+          AND g.season = $2
+          AND g.completed = true
+        ORDER BY g.week
+      `, [actualTeamName, season]);
+      
+      console.log(`✅ Basic query returned ${basicResult.rows.length} games`);
+      res.json(basicResult.rows);
+    } else {
+      res.json(result.rows);
+    }
     
   } catch (err) {
     console.error('❌ Error in games-enhanced:', err);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      details: err.message 
+    
+    // If enhanced query completely fails, try basic query as fallback
+    try {
+      console.log(`🔄 Enhanced query failed, trying basic fallback...`);
+      const teamName = decodeURIComponent(req.params.teamName);
+      const { season } = req.params;
+      
+      const fallbackResult = await pool.query(`
+        SELECT 
+          g.id,
+          g.season,
+          g.week,
+          g.start_date,
+          g.home_team,
+          g.away_team,
+          g.home_points,
+          g.away_points,
+          g.completed,
+          g.home_postgame_win_probability,
+          g.away_postgame_win_probability,
+          g.season_type,
+          
+          CASE 
+            WHEN g.home_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1) THEN g.away_team
+            ELSE g.home_team
+          END as opponent,
+          CASE 
+            WHEN g.home_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1) THEN 'home'
+            ELSE 'away'
+          END as home_away,
+          
+          NULL as opponent_logo,
+          NULL as home_moneyline,
+          NULL as away_moneyline,
+          NULL as spread,
+          NULL as betting_provider,
+          NULL as offense_ppa,
+          NULL as defense_ppa
+          
+        FROM games g
+        WHERE (g.home_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1) 
+               OR g.away_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1))
+          AND g.season = $2
+          AND g.completed = true
+        ORDER BY g.week
+      `, [teamName, season]);
+      
+      console.log(`✅ Fallback query returned ${fallbackResult.rows.length} games`);
+      res.json(fallbackResult.rows);
+      
+    } catch (fallbackErr) {
+      console.error('❌ Even fallback query failed:', fallbackErr);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        details: err.message 
+      });
+    }
+  }
+});
+
+// 🔧 STEP 2: Remove debug info from TeamPage component
+
+// In your TeamPage.js, find and DELETE these lines (around where you have the debug component):
+
+/* DELETE THIS SECTION:
+        // DEBUG INFO - Temporary 
+        <GamesDebugInfo games={games} />
+*/
+
+// Also DELETE the GamesDebugInfo component definition:
+
+/* DELETE THIS ENTIRE COMPONENT:
+  const GamesDebugInfo = ({ games }) => {
+    if (!games) return <div>Games is null/undefined</div>;
+    if (!Array.isArray(games)) return <div>Games is not an array: {typeof games}</div>;
+    
+    return (
+      <div style={{ 
+        backgroundColor: '#f0f0f0', 
+        padding: '10px', 
+        margin: '10px 0',
+        borderRadius: '4px',
+        fontFamily: 'monospace'
+      }}>
+        <strong>🐛 DEBUG INFO:</strong><br/>
+        Games array length: {games.length}<br/>
+        {games.length > 0 && (
+          <>
+            First game keys: {Object.keys(games[0]).join(', ')}<br/>
+            First game: {JSON.stringify(games[0], null, 2).substring(0, 200)}...
+          </>
+        )}
+      </div>
+    );
+  };
+*/
+
+// 🔧 STEP 3: Test if you have the required tables
+
+// Add this temporary debug endpoint to check your database structure:
+app.get('/api/debug-tables', async (req, res) => {
+  try {
+    // Check what tables exist
+    const tablesResult = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      ORDER BY table_name
+    `);
+    
+    const tables = tablesResult.rows.map(row => row.table_name);
+    
+    // Check if PPA tables exist and have data
+    let ppaTableInfo = {};
+    if (tables.includes('advanced_game_stats')) {
+      const ppaCount = await pool.query(`
+        SELECT COUNT(*) as count, COUNT(offense_ppa) as ppa_count
+        FROM advanced_game_stats 
+        WHERE season = 2024
+      `);
+      ppaTableInfo.advanced_game_stats = ppaCount.rows[0];
+    }
+    
+    // Check betting lines table
+    let bettingTableInfo = {};
+    if (tables.includes('game_betting_lines')) {
+      const bettingCount = await pool.query(`
+        SELECT COUNT(*) as count, COUNT(DISTINCT provider) as providers
+        FROM game_betting_lines
+      `);
+      bettingTableInfo.game_betting_lines = bettingCount.rows[0];
+    }
+    
+    res.json({
+      all_tables: tables,
+      has_advanced_game_stats: tables.includes('advanced_game_stats'),
+      has_game_betting_lines: tables.includes('game_betting_lines'),
+      ppa_data: ppaTableInfo,
+      betting_data: bettingTableInfo
     });
+    
+  } catch (err) {
+    res.json({ error: err.message });
   }
 });
 

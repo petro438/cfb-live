@@ -1273,293 +1273,357 @@ if (game.home_moneyline && game.away_moneyline) {
     </div>
   );
 
-  // Main Component
+  // 🔧 FIXED: Correct function order in TeamPage component
+
 function TeamPage() {
   console.log('🚀 TeamPage component rendered');
   
   const { teamName } = useParams();
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'; // ADD THIS LINE
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   console.log('🎯 Team name from URL:', teamName);
   
   const [teamData, setTeamData] = useState(null);
-    const [games, setGames] = useState([]);
-    const [stats, setStats] = useState(null);
-    const [allTeamsAdvancedStats, setAllTeamsAdvancedStats] = useState(null);
-    const [allTeamsRankings, setAllTeamsRankings] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const [games, setGames] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [allTeamsAdvancedStats, setAllTeamsAdvancedStats] = useState(null);
+  const [allTeamsRankings, setAllTeamsRankings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    useEffect(() => {
-    console.log('🔄 useEffect triggered for teamName:', teamName);
-    loadTeamData();
-    }, [teamName, loadTeamData]); // ✅ add loadTeamData
-
-
-   // Replace your loadTeamData function in TeamPage.js with this fixed version:
-
-// Replace the useEffect and loadTeamData section in your TeamPage.js with this:
-
-// 2. ALSO - Update your TeamPage.js loadTeamData function with better error handling:
-
-const loadTeamData = async () => {
-  console.log('📡 Starting API calls for:', teamName);
-  
-  try {
-    setLoading(true);
+  // ✅ DEFINE loadTeamData FUNCTION FIRST (before useEffect)
+  const loadTeamData = React.useCallback(async () => {
+    console.log('📡 Starting API calls for:', teamName);
     
-    // Test the simplified games endpoint first
-    const gamesUrl = `${API_URL}/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`;
-    console.log('🔍 Games URL:', gamesUrl);
-    
-    const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
-      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?season=2025`),
-      fetch(gamesUrl),
-      fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
-      fetch(`${API_URL}/api/all-advanced-stats/2024`),
-      fetch(`${API_URL}/api/power-rankings?season=2025`)
-    ]);
-
-    console.log('📊 API responses:', {
-      team: { ok: teamResponse.ok, status: teamResponse.status },
-      games: { ok: gamesResponse.ok, status: gamesResponse.status },
-      stats: { ok: statsResponse.ok, status: statsResponse.status },
-      allAdvanced: { ok: allAdvancedStatsResponse.ok, status: allAdvancedStatsResponse.status },
-      rankings: { ok: rankingsResponse.ok, status: rankingsResponse.status }
-    });
-
-    if (!teamResponse.ok) {
-      throw new Error(`Team not found: ${teamName}`);
-    }
-
-    const team = await teamResponse.json();
-    
-    // Handle games response with detailed debugging
-    let games = [];
-    if (gamesResponse.ok) {
-      const gamesData = await gamesResponse.json();
-      console.log('🏈 Raw games response type:', typeof gamesData);
-      console.log('🏈 Raw games response length:', Array.isArray(gamesData) ? gamesData.length : 'Not an array');
-      console.log('🏈 First 100 chars of response:', JSON.stringify(gamesData).substring(0, 100));
+    try {
+      setLoading(true);
       
-      if (Array.isArray(gamesData)) {
-        games = gamesData;
-        console.log(`✅ Successfully loaded ${games.length} games`);
-      } else if (gamesData && gamesData.games && Array.isArray(gamesData.games)) {
-        games = gamesData.games;
-        console.log(`✅ Successfully loaded ${games.length} games from .games property`);
-      } else {
-        console.log('❌ Games data is not in expected format:', gamesData);
-        games = [];
+      // Test the simplified games endpoint first
+      const gamesUrl = `${API_URL}/api/teams/${encodeURIComponent(teamName)}/games-enhanced/2024`;
+      console.log('🔍 Games URL:', gamesUrl);
+      
+      const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
+        fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?season=2025`),
+        fetch(gamesUrl),
+        fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
+        fetch(`${API_URL}/api/all-advanced-stats/2024`),
+        fetch(`${API_URL}/api/power-rankings?season=2025`)
+      ]);
+
+      console.log('📊 API responses:', {
+        team: { ok: teamResponse.ok, status: teamResponse.status },
+        games: { ok: gamesResponse.ok, status: gamesResponse.status },
+        stats: { ok: statsResponse.ok, status: statsResponse.status },
+        allAdvanced: { ok: allAdvancedStatsResponse.ok, status: allAdvancedStatsResponse.status },
+        rankings: { ok: rankingsResponse.ok, status: rankingsResponse.status }
+      });
+
+      if (!teamResponse.ok) {
+        throw new Error(`Team not found: ${teamName}`);
       }
-    } else {
-      console.log('❌ Games response failed:', gamesResponse.status);
-      const errorText = await gamesResponse.text();
-      console.log('❌ Games error details:', errorText);
+
+      const team = await teamResponse.json();
+      
+      // Handle games response with detailed debugging
+      let games = [];
+      if (gamesResponse.ok) {
+        const gamesData = await gamesResponse.json();
+        console.log('🏈 Raw games response type:', typeof gamesData);
+        console.log('🏈 Raw games response length:', Array.isArray(gamesData) ? gamesData.length : 'Not an array');
+        console.log('🏈 First 100 chars of response:', JSON.stringify(gamesData).substring(0, 100));
+        
+        if (Array.isArray(gamesData)) {
+          games = gamesData;
+          console.log(`✅ Successfully loaded ${games.length} games`);
+        } else if (gamesData && gamesData.games && Array.isArray(gamesData.games)) {
+          games = gamesData.games;
+          console.log(`✅ Successfully loaded ${games.length} games from .games property`);
+        } else {
+          console.log('❌ Games data is not in expected format:', gamesData);
+          games = [];
+        }
+      } else {
+        console.log('❌ Games response failed:', gamesResponse.status);
+        const errorText = await gamesResponse.text();
+        console.log('❌ Games error details:', errorText);
+      }
+      
+      // Process other responses
+      const stats = statsResponse.ok ? await statsResponse.json() : null;
+      const allAdvancedStats = allAdvancedStatsResponse.ok ? await allAdvancedStatsResponse.json() : null;
+      const rankingsData = rankingsResponse.ok ? await rankingsResponse.json() : null;
+      const rankings = rankingsData?.teams || rankingsData || [];
+
+      // Convert string numbers to actual numbers
+      const processedTeam = {
+        ...team,
+        power_rating: parseFloat(team.power_rating),
+        offense_rating: parseFloat(team.offense_rating),
+        defense_rating: parseFloat(team.defense_rating),
+        power_rank: parseInt(team.power_rank),
+        offense_rank: parseInt(team.offense_rank),
+        defense_rank: parseInt(team.defense_rank)
+      };
+
+      const processedStats = stats ? {
+        ...stats,
+        offense_ppa: parseFloat(stats.offense_ppa),
+        defense_ppa: parseFloat(stats.defense_ppa),
+        offense_success_rate: parseFloat(stats.offense_success_rate),
+        offense_explosiveness: parseFloat(stats.offense_explosiveness)
+      } : null;
+
+      console.log('🎯 Final data summary:', {
+        team: processedTeam.team_name,
+        gamesCount: games.length,
+        hasStats: !!processedStats,
+        hasAdvancedStats: !!allAdvancedStats,
+        hasRankings: rankings.length
+      });
+
+      setTeamData(processedTeam);
+      setGames(games);
+      setStats(processedStats);
+      setAllTeamsAdvancedStats(allAdvancedStats);
+      setAllTeamsRankings(rankings);
+      setLoading(false);
+      
+      console.log('✅ All data loaded successfully');
+    } catch (err) {
+      console.error('❌ Error loading team data:', err);
+      setError(err.message);
+      setLoading(false);
     }
+  }, [teamName, API_URL]); // ✅ Include dependencies
+
+  // ✅ NOW useEffect can reference loadTeamData (defined above)
+  useEffect(() => {
+    console.log('🔄 useEffect triggered for teamName:', teamName);
+    if (teamName) {
+      loadTeamData();
+    }
+  }, [teamName, loadTeamData]); // ✅ Include loadTeamData in dependencies
+
+  // Helper Functions (keep these where they are)
+  const calculateRecord = (games) => {
+    if (!games || games.length === 0) return "0-0";
     
-    // Process other responses
-    const stats = statsResponse.ok ? await statsResponse.json() : null;
-    const allAdvancedStats = allAdvancedStatsResponse.ok ? await allAdvancedStatsResponse.json() : null;
-    const rankingsData = rankingsResponse.ok ? await rankingsResponse.json() : null;
-    const rankings = rankingsData?.teams || rankingsData || [];
-
-    // Convert string numbers to actual numbers
-    const processedTeam = {
-      ...team,
-      power_rating: parseFloat(team.power_rating),
-      offense_rating: parseFloat(team.offense_rating),
-      defense_rating: parseFloat(team.defense_rating),
-      power_rank: parseInt(team.power_rank),
-      offense_rank: parseInt(team.offense_rank),
-      defense_rank: parseInt(team.defense_rank)
-    };
-
-    const processedStats = stats ? {
-      ...stats,
-      offense_ppa: parseFloat(stats.offense_ppa),
-      defense_ppa: parseFloat(stats.defense_ppa),
-      offense_success_rate: parseFloat(stats.offense_success_rate),
-      offense_explosiveness: parseFloat(stats.offense_explosiveness)
-    } : null;
-
-    console.log('🎯 Final data summary:', {
-      team: processedTeam.team_name,
-      gamesCount: games.length,
-      hasStats: !!processedStats,
-      hasAdvancedStats: !!allAdvancedStats,
-      hasRankings: rankings.length
+    let wins = 0;
+    let losses = 0;
+    
+    games.forEach(game => {
+      if (game.completed) {
+        const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
+        const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
+        
+        if (teamScore > opponentScore) {
+          wins++;
+        } else {
+          losses++;
+        }
+      }
     });
-
-    setTeamData(processedTeam);
-    setGames(games);
-    setStats(processedStats);
-    setAllTeamsAdvancedStats(allAdvancedStats);
-    setAllTeamsRankings(rankings);
-    setLoading(false);
     
-    console.log('✅ All data loaded successfully');
-  } catch (err) {
-    console.error('❌ Error loading team data:', err);
-    setError(err.message);
-    setLoading(false);
-  }
-};
+    return `${wins}-${losses}`;
+  };
 
-// Move useEffect AFTER the function definition
-useEffect(() => {
-  console.log('🔄 useEffect triggered for teamName:', teamName);
-  if (teamName) {
-    loadTeamData();
-  }
-}, [teamName]); // Remove loadTeamData from dependencies
-
-    if (loading) {
-      return (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          minHeight: '100vh',
-          fontFamily: '"Trebuchet MS", Arial, sans-serif'
-        }}>
-          Loading {teamName} 2024 season...
+  // StatCard component
+  const StatCard = ({ title, value, rank }) => (
+    <div style={{
+      backgroundColor: '#f8f9fa',
+      border: '1px solid #dee2e6',
+      borderRadius: '8px',
+      padding: '20px',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: '14px', color: '#6c757d', marginBottom: '8px' }}>
+        {title}
+      </div>
+      <div style={{ fontSize: '24px', fontWeight: 'bold', fontFamily: '"Courier New", Courier, monospace' }}>
+        {value}
+      </div>
+      {rank && (
+        <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '4px' }}>
+          Rank: #{rank}
         </div>
-      );
-    }
+      )}
+    </div>
+  );
 
-    if (error) {
-      return (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          minHeight: '100vh',
-          fontFamily: '"Trebuchet MS", Arial, sans-serif',
-          flexDirection: 'column',
-          color: '#d32f2f'
-        }}>
-          <div>{error}</div>
-          <button 
-            onClick={() => window.history.back()}
-            style={{
-              marginTop: '10px',
-              padding: '8px 16px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Go Back
-          </button>
-        </div>
-      );
-    }
-
+  // Temporary Debug Component
+  const GamesDebugInfo = ({ games }) => {
+    if (!games) return <div>Games is null/undefined</div>;
+    if (!Array.isArray(games)) return <div>Games is not an array: {typeof games}</div>;
+    
     return (
       <div style={{ 
-        fontFamily: '"Trebuchet MS", Arial, sans-serif', 
-        backgroundColor: '#ffffff',
-        minHeight: '100vh'
+        backgroundColor: '#f0f0f0', 
+        padding: '10px', 
+        margin: '10px 0',
+        borderRadius: '4px',
+        fontFamily: 'monospace'
       }}>
-        {/* Team Header */}
-        <div style={{
-          background: `linear-gradient(135deg, ${teamData.primary_color || '#333'}, ${teamData.secondary_color || '#666'})`,
-          color: 'white',
-          padding: '20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
-              <img 
-                src={teamData.logo} 
-                alt={`${teamData.team_name} logo`}
-                style={{ width: '80px', height: '80px' }}
-              />
-              <div>
-                <h1 style={{ margin: '0', fontSize: '36px', textTransform: 'uppercase' }}>
-                  {teamData.team_name}
-                </h1>
-                <div style={{ fontSize: '18px', opacity: 0.9 }}>
-                  {teamData.conference} • 2024 Season
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <strong>🐛 DEBUG INFO:</strong><br/>
+        Games array length: {games.length}<br/>
+        {games.length > 0 && (
+          <>
+            First game keys: {Object.keys(games[0]).join(', ')}<br/>
+            First game: {JSON.stringify(games[0], null, 2).substring(0, 200)}...
+          </>
+        )}
+      </div>
+    );
+  };
 
-        {/* Content Area */}
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-          
-          {/* Season Summary */}
-          <div style={{ marginBottom: '30px' }}>
-            <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
-              2024 Season Summary
-            </h2>
-            
-            {/* Record and Key Stats */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '20px',
-              marginTop: '20px'
-            }}>
-              <StatCard title="Final Record" value={calculateRecord(games)} />
-              <StatCard title="Power Rating" value={teamData.power_rating?.toFixed(1) || 'N/A'} rank={teamData.power_rank} />
-              <StatCard title="Offense Rating" value={teamData.offense_rating?.toFixed(1) || 'N/A'} rank={teamData.offense_rank} />
-              <StatCard title="Defense Rating" value={teamData.defense_rating?.toFixed(1) || 'N/A'} rank={teamData.defense_rank} />
-            </div>
-          </div>
-
-          {/* Completed Games */}
-<div style={{ marginBottom: '30px' }}>
-  <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
-    Completed Games
-  </h2>
-  <CompletedGamesTable 
-    games={games} 
-    teamName={teamName} 
-    allTeamsRankings={allTeamsRankings} 
-  />
-</div>
-
-          {/* Advanced Stats - FIXED INTEGRATION */}
-          <div style={{ marginBottom: '30px' }}>
-            <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
-              2024 Advanced Statistics
-            </h2>
-            
-            <div style={{ marginTop: '20px' }}>
-              <AdvancedStatsTable 
-                teamName={teamName}
-                teamStats={stats}
-                allTeamsStats={allTeamsAdvancedStats} // Fixed prop name
-              />
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <div style={{ textAlign: 'center', marginTop: '40px' }}>
-            <button 
-              onClick={() => window.history.back()}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                fontFamily: '"Trebuchet MS", Arial, sans-serif'
-              }}
-            >
-              ← Back to Rankings
-            </button>
-          </div>
-        </div>
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        fontFamily: '"Trebuchet MS", Arial, sans-serif'
+      }}>
+        Loading {teamName} 2024 season...
       </div>
     );
   }
 
-  export default TeamPage;
+  if (error) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        fontFamily: '"Trebuchet MS", Arial, sans-serif',
+        flexDirection: 'column',
+        color: '#d32f2f'
+      }}>
+        <div>{error}</div>
+        <button 
+          onClick={() => window.history.back()}
+          style={{
+            marginTop: '10px',
+            padding: '8px 16px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ 
+      fontFamily: '"Trebuchet MS", Arial, sans-serif', 
+      backgroundColor: '#ffffff',
+      minHeight: '100vh'
+    }}>
+      {/* Team Header */}
+      <div style={{
+        background: `linear-gradient(135deg, ${teamData.primary_color || '#333'}, ${teamData.secondary_color || '#666'})`,
+        color: 'white',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+            <img 
+              src={teamData.logo} 
+              alt={`${teamData.team_name} logo`}
+              style={{ width: '80px', height: '80px' }}
+            />
+            <div>
+              <h1 style={{ margin: '0', fontSize: '36px', textTransform: 'uppercase' }}>
+                {teamData.team_name}
+              </h1>
+              <div style={{ fontSize: '18px', opacity: 0.9 }}>
+                {teamData.conference} • 2024 Season
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+        
+        {/* Season Summary */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
+            2024 Season Summary
+          </h2>
+          
+          {/* Record and Key Stats */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '20px',
+            marginTop: '20px'
+          }}>
+            <StatCard title="Final Record" value={calculateRecord(games)} />
+            <StatCard title="Power Rating" value={teamData.power_rating?.toFixed(1) || 'N/A'} rank={teamData.power_rank} />
+            <StatCard title="Offense Rating" value={teamData.offense_rating?.toFixed(1) || 'N/A'} rank={teamData.offense_rank} />
+            <StatCard title="Defense Rating" value={teamData.defense_rating?.toFixed(1) || 'N/A'} rank={teamData.defense_rank} />
+          </div>
+        </div>
+
+        {/* DEBUG INFO - Temporary */}
+        <GamesDebugInfo games={games} />
+
+        {/* Completed Games */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
+            Completed Games
+          </h2>
+          <CompletedGamesTable 
+            games={games} 
+            teamName={teamName} 
+            allTeamsRankings={allTeamsRankings} 
+          />
+        </div>
+
+        {/* Advanced Stats */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
+            2024 Advanced Statistics
+          </h2>
+          
+          <div style={{ marginTop: '20px' }}>
+            <AdvancedStatsTable 
+              teamName={teamName}
+              teamStats={stats}
+              allTeamsStats={allTeamsAdvancedStats}
+            />
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div style={{ textAlign: 'center', marginTop: '40px' }}>
+          <button 
+            onClick={() => window.history.back()}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              fontFamily: '"Trebuchet MS", Arial, sans-serif'
+            }}
+          >
+            ← Back to Rankings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default TeamPage;

@@ -490,16 +490,33 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
-// Enhanced games endpoint
+// 1. FIRST - Replace your games-enhanced endpoint in server.js with this SIMPLIFIED version:
+
 app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
   try {
     const teamName = decodeURIComponent(req.params.teamName);
     const { season } = req.params;
     
-    console.log(`🔍 Fetching enhanced games for: "${teamName}", season ${season}`);
+    console.log(`🔍 Enhanced games for: "${teamName}", season ${season}`);
     
+    // Get the actual team name from teams table
+    const teamResult = await pool.query(`
+      SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1
+    `, [teamName]);
+    
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Team not found',
+        requested_team: teamName
+      });
+    }
+    
+    const actualTeamName = teamResult.rows[0].school;
+    console.log(`✅ Found team: "${actualTeamName}"`);
+    
+    // SIMPLIFIED QUERY - just get the essential data that we know exists
     const result = await pool.query(`
-      SELECT DISTINCT ON (g.id) 
+      SELECT 
         g.id,
         g.season,
         g.week,
@@ -512,6 +529,7 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
         g.home_postgame_win_probability,
         g.away_postgame_win_probability,
         g.season_type,
+        
         CASE 
           WHEN g.home_team = $1 THEN g.away_team
           ELSE g.home_team
@@ -521,26 +539,10 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
           ELSE 'away'
         END as home_away,
         
-        -- Game betting lines with DraftKings preference, ESPN Bet fallback
-        COALESCE(dk_lines.home_moneyline, espn_lines.home_moneyline) as home_moneyline,
-        COALESCE(dk_lines.away_moneyline, espn_lines.away_moneyline) as away_moneyline,
-        COALESCE(dk_lines.spread, espn_lines.spread) as spread,
-        COALESCE(dk_lines.provider, espn_lines.provider) as betting_provider,
-        
-        -- Advanced game stats for this team
-        ags.offense_ppa,
-        ags.defense_ppa,
-        
-        -- Opponent team info for logos
+        -- Get opponent logo from teams table
         t_opp.logo_url as opponent_logo
         
       FROM games g
-      LEFT JOIN game_betting_lines dk_lines ON g.id = dk_lines.game_id 
-      AND UPPER(TRIM(dk_lines.provider)) = 'DRAFTKINGS'
-      LEFT JOIN game_betting_lines espn_lines ON g.id = espn_lines.game_id 
-      AND UPPER(TRIM(espn_lines.provider)) = 'ESPN BET'
-      LEFT JOIN advanced_game_stats ags ON g.id = ags.game_id 
-        AND UPPER(TRIM(ags.team)) = UPPER(TRIM($1))
       LEFT JOIN teams t_opp ON LOWER(TRIM(t_opp.school)) = LOWER(TRIM(CASE 
         WHEN g.home_team = $1 THEN g.away_team
         ELSE g.home_team
@@ -549,15 +551,32 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
       WHERE (g.home_team = $1 OR g.away_team = $1) 
         AND g.season = $2
         AND g.completed = true
-        AND g.season_type IN ('regular', 'postseason')
       ORDER BY g.week
-    `, [teamName, season]);
+    `, [actualTeamName, season]);
     
-    console.log(`✅ Found ${result.rows.length} enhanced games for "${teamName}" in ${season}`);
-    res.json(result.rows);
+    console.log(`✅ Found ${result.rows.length} games for ${actualTeamName} in ${season}`);
+    
+    // Add the missing fields that your frontend expects (set defaults for now)
+    const processedGames = result.rows.map(game => ({
+      ...game,
+      // Add betting data as null for now (we'll add this back later)
+      home_moneyline: null,
+      away_moneyline: null,
+      spread: null,
+      betting_provider: null,
+      // Add PPA data as null for now 
+      offense_ppa: null,
+      defense_ppa: null
+    }));
+    
+    res.json(processedGames);
+    
   } catch (err) {
-    console.error('Error fetching enhanced games:', err);
-    res.status(500).json({ error: err.message, details: err.stack });
+    console.error('❌ Error in games-enhanced:', err);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: err.message 
+    });
   }
 });
 
@@ -786,6 +805,7 @@ app.get('/api/debug-columns', async (req, res) => {
       column_details: columns.rows,
       sample_row: sample.rows[0] || null,
       has_season_column: columns.rows.some(col => col.column_name === 'season'),
+      has_year_column: columns.rows.some(col => col.column_name === 'year')
     });
     
   } catch (err) {
@@ -794,10 +814,6 @@ app.get('/api/debug-columns', async (req, res) => {
       code: err.code
     });
   }
-});
-
-app.get('/api/debug-games/:teamName', async (req, res) => {
-  // ... (use the code from the artifact above)
 });
 
 // Default route

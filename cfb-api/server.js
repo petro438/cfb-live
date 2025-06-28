@@ -499,7 +499,7 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
     console.log(`🔍 Fetching enhanced games for: "${teamName}", season ${season}`);
     
     const result = await pool.query(`
-      SELECT 
+      SELECT DISTINCT ON (g.id) 
         g.id,
         g.season,
         g.week,

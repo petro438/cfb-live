@@ -513,9 +513,9 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
     const actualTeamName = teamResult.rows[0].school;
     console.log(`✅ Found team: "${actualTeamName}"`);
     
-    // Enhanced query with PPA data and betting lines
+    // FIXED: Enhanced query with DISTINCT to prevent duplicates
     const result = await pool.query(`
-      SELECT 
+      SELECT DISTINCT ON (g.id)
         g.id,
         g.season,
         g.week,
@@ -528,6 +528,7 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
         g.home_postgame_win_probability,
         g.away_postgame_win_probability,
         g.season_type,
+        g.conference_game,
         
         CASE 
           WHEN g.home_team = $1 THEN g.away_team
@@ -541,7 +542,7 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
         -- Get opponent logo from teams table
         t_opp.logo_url as opponent_logo,
         
-        -- Get betting lines (check if these tables exist)
+        -- Get betting lines (nullable)
         bl.home_moneyline,
         bl.away_moneyline,
         bl.spread,
@@ -564,129 +565,22 @@ app.get('/api/teams/:teamName/games-enhanced/:season', async (req, res) => {
       WHERE (g.home_team = $1 OR g.away_team = $1) 
         AND g.season = $2
         AND g.completed = true
-      ORDER BY g.week
+      ORDER BY g.id, g.week
     `, [actualTeamName, season]);
     
-    console.log(`✅ Found ${result.rows.length} enhanced games for ${actualTeamName} in ${season}`);
+    console.log(`✅ Found ${result.rows.length} UNIQUE enhanced games for ${actualTeamName} in ${season}`);
     
-    // If the enhanced query fails due to missing tables, fall back to basic query
-    if (result.rows.length === 0) {
-      console.log(`⚠️ No enhanced games found, trying basic query...`);
-      
-      const basicResult = await pool.query(`
-        SELECT 
-          g.id,
-          g.season,
-          g.week,
-          g.start_date,
-          g.home_team,
-          g.away_team,
-          g.home_points,
-          g.away_points,
-          g.completed,
-          g.home_postgame_win_probability,
-          g.away_postgame_win_probability,
-          g.season_type,
-          
-          CASE 
-            WHEN g.home_team = $1 THEN g.away_team
-            ELSE g.home_team
-          END as opponent,
-          CASE 
-            WHEN g.home_team = $1 THEN 'home'
-            ELSE 'away'
-          END as home_away,
-          
-          -- Get opponent logo from teams table
-          t_opp.logo_url as opponent_logo,
-          
-          -- Set nulls for missing data
-          NULL as home_moneyline,
-          NULL as away_moneyline,
-          NULL as spread,
-          NULL as betting_provider,
-          NULL as offense_ppa,
-          NULL as defense_ppa
-          
-        FROM games g
-        LEFT JOIN teams t_opp ON LOWER(TRIM(t_opp.school)) = LOWER(TRIM(CASE 
-          WHEN g.home_team = $1 THEN g.away_team
-          ELSE g.home_team
-        END))
-        
-        WHERE (g.home_team = $1 OR g.away_team = $1) 
-          AND g.season = $2
-          AND g.completed = true
-        ORDER BY g.week
-      `, [actualTeamName, season]);
-      
-      console.log(`✅ Basic query returned ${basicResult.rows.length} games`);
-      res.json(basicResult.rows);
-    } else {
-      res.json(result.rows);
-    }
+    res.json(result.rows);
     
   } catch (err) {
     console.error('❌ Error in games-enhanced:', err);
-    
-    // If enhanced query completely fails, try basic query as fallback
-    try {
-      console.log(`🔄 Enhanced query failed, trying basic fallback...`);
-      const teamName = decodeURIComponent(req.params.teamName);
-      const { season } = req.params;
-      
-      const fallbackResult = await pool.query(`
-        SELECT 
-          g.id,
-          g.season,
-          g.week,
-          g.start_date,
-          g.home_team,
-          g.away_team,
-          g.home_points,
-          g.away_points,
-          g.completed,
-          g.home_postgame_win_probability,
-          g.away_postgame_win_probability,
-          g.season_type,
-          
-          CASE 
-            WHEN g.home_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1) THEN g.away_team
-            ELSE g.home_team
-          END as opponent,
-          CASE 
-            WHEN g.home_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1) THEN 'home'
-            ELSE 'away'
-          END as home_away,
-          
-          NULL as opponent_logo,
-          NULL as home_moneyline,
-          NULL as away_moneyline,
-          NULL as spread,
-          NULL as betting_provider,
-          NULL as offense_ppa,
-          NULL as defense_ppa
-          
-        FROM games g
-        WHERE (g.home_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1) 
-               OR g.away_team = (SELECT school FROM teams WHERE LOWER(school) = LOWER($1) LIMIT 1))
-          AND g.season = $2
-          AND g.completed = true
-        ORDER BY g.week
-      `, [teamName, season]);
-      
-      console.log(`✅ Fallback query returned ${fallbackResult.rows.length} games`);
-      res.json(fallbackResult.rows);
-      
-    } catch (fallbackErr) {
-      console.error('❌ Even fallback query failed:', fallbackErr);
-      res.status(500).json({ 
-        error: 'Internal server error',
-        details: err.message 
-      });
-    }
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: err.message 
+    });
   }
 });
+
 
 // 🔧 STEP 2: Remove debug info from TeamPage component
 
@@ -774,7 +668,6 @@ app.get('/api/debug-tables', async (req, res) => {
   }
 });
 
-// All advanced stats endpoint
 app.get('/api/all-advanced-stats/:season', async (req, res) => {
   try {
     const { season } = req.params;
@@ -782,7 +675,7 @@ app.get('/api/all-advanced-stats/:season', async (req, res) => {
     console.log(`🔍 Fetching all advanced stats with per-game calculations for season ${season}`);
     
     const query = `
-      SELECT 
+      SELECT DISTINCT ON (ass.team)
         ass.team as team_name,
         ass.season,
         
@@ -919,12 +812,12 @@ app.get('/api/all-advanced-stats/:season', async (req, res) => {
         
       FROM advanced_season_stats ass
       WHERE ass.season = $1
-      ORDER BY ass.team
+      ORDER BY ass.team, ass.season DESC
     `;
     
     const result = await pool.query(query, [season]);
     
-    console.log(`✅ Found ${result.rows.length} teams with per-game calculations for season ${season}`);
+    console.log(`✅ Found ${result.rows.length} UNIQUE teams with per-game calculations for season ${season}`);
     
     res.json(result.rows);
     

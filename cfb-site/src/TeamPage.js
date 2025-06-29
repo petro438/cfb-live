@@ -139,20 +139,7 @@
   // Completed Games Table Component
   const CompletedGamesTable = ({ games, teamName, allTeamsRankings }) => {
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-    // Deduplicate games by ID
-const uniqueGames = React.useMemo(() => {
-  console.log('🔍 Raw games count:', games.length);
-  const deduped = games.filter((game, index, self) => 
-    index === self.findIndex(g => g.id === game.id)
-  );
-  console.log('🔍 Unique games count:', deduped.length);
-  
-  if (games.length !== deduped.length) {
-    console.log('🐛 Removed', games.length - deduped.length, 'duplicate games');
-  }
-  
-  return deduped;
-}, [games]);
+
 // ADD THE HELPER FUNCTION HERE:
   const getOpponentRank = (opponentName) => {
   if (!allTeamsRankings || !opponentName || !Array.isArray(allTeamsRankings)) {
@@ -265,8 +252,14 @@ const uniqueGames = React.useMemo(() => {
             </tr>
           </thead>
           <tbody>
-            {[...uniqueGames]
-    .sort((a, b) => {
+            {games
+  .filter((game, index, self) => 
+    index === self.findIndex(g => g.id === game.id)
+  )
+  .filter(game => 
+    game.completed === true
+  )
+  .sort((a, b) => {
       // Regular season games first, then postseason
       if (a.season_type === 'postseason' && b.season_type !== 'postseason') return 1;
       if (a.season_type !== 'postseason' && b.season_type === 'postseason') return -1;
@@ -502,8 +495,14 @@ const uniqueGames = React.useMemo(() => {
         </tr>
       </thead>
       <tbody>
-        {[...uniqueGames]
-    .sort((a, b) => {
+        {games
+  .filter((game, index, self) => 
+    index === self.findIndex(g => g.id === game.id)
+  )
+  .filter(game => 
+    game.completed === true
+  )
+  .sort((a, b) => {
       // Regular season games first, then postseason
       if (a.season_type === 'postseason' && b.season_type !== 'postseason') return 1;
       if (a.season_type !== 'postseason' && b.season_type === 'postseason') return -1;
@@ -1528,25 +1527,11 @@ function TeamPage() {
       {/* Content Area */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
         
-        {/* Season Summary */}
-        <div style={{ marginBottom: '30px' }}>
-          <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
-            2024 Season Summary
-          </h2>
-          
-          {/* Record and Key Stats */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '20px',
-            marginTop: '20px'
-          }}>
-            <StatCard title="Final Record" value={calculateRecord(games)} />
-            <StatCard title="Power Rating" value={teamData.power_rating?.toFixed(1) || 'N/A'} rank={teamData.power_rank} />
-            <StatCard title="Offense Rating" value={teamData.offense_rating?.toFixed(1) || 'N/A'} rank={teamData.offense_rank} />
-            <StatCard title="Defense Rating" value={teamData.defense_rating?.toFixed(1) || 'N/A'} rank={teamData.defense_rank} />
-          </div>
-        </div>
+         <CondensedSeasonSummary 
+          teamData={teamData} 
+          games={games} 
+          allTeamsRankings={allTeamsRankings} 
+        />
 
         {/* Completed Games */}
         <div style={{ marginBottom: '30px' }}>

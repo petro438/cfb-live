@@ -1272,6 +1272,283 @@ if (game.home_moneyline && game.away_moneyline) {
     </div>
   );
 
+  const CondensedSeasonSummary = ({ teamData, games, allTeamsRankings }) => {
+  // Calculate overall record
+  const calculateRecord = (games, conferenceOnly = false) => {
+    if (!games || games.length === 0) return "0-0";
+    
+    let wins = 0;
+    let losses = 0;
+    
+    games.forEach(game => {
+      if (game.completed) {
+        // Filter for conference games if requested
+        if (conferenceOnly && !game.conference_game) return;
+        
+        const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
+        const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
+        
+        if (teamScore > opponentScore) {
+          wins++;
+        } else {
+          losses++;
+        }
+      }
+    });
+    
+    return `${wins}-${losses}`;
+  };
+
+  // Calculate strength of schedule from games played
+  const calculateStrengthOfSchedule = (games, allTeamsRankings) => {
+    if (!games || !allTeamsRankings || games.length === 0) return null;
+    
+    let totalRating = 0;
+    let gamesCount = 0;
+    
+    games.forEach(game => {
+      if (game.completed && game.opponent) {
+        // Find opponent's power rating
+        const opponent = allTeamsRankings.find(team => 
+          team.team_name === game.opponent || 
+          team.school === game.opponent
+        );
+        
+        if (opponent && opponent.power_rating) {
+          totalRating += parseFloat(opponent.power_rating);
+          gamesCount++;
+        }
+      }
+    });
+    
+    return gamesCount > 0 ? totalRating / gamesCount : null;
+  };
+
+  // Get percentile color for ratings
+  const getPercentileColor = (rank, total) => {
+    if (!rank || !total || rank === 'N/A') return '#f8f9fa';
+    
+    const percentile = ((total - rank + 1) / total) * 100;
+    
+    if (percentile >= 96) return '#58c36c';
+    if (percentile >= 91) return '#6aca7c';
+    if (percentile >= 86) return '#7cd08b';
+    if (percentile >= 81) return '#8dd69b';
+    if (percentile >= 76) return '#9fddaa';
+    if (percentile >= 71) return '#b0e3ba';
+    if (percentile >= 66) return '#c2e9c9';
+    if (percentile >= 61) return '#d4f0d9';
+    if (percentile >= 56) return '#e5f6e8';
+    if (percentile >= 51) return '#f7fcf8';
+    if (percentile >= 46) return '#fdf5f4';
+    if (percentile >= 41) return '#fbe1df';
+    if (percentile >= 36) return '#f9cdc9';
+    if (percentile >= 31) return '#f7b9b4';
+    if (percentile >= 26) return '#f5a59f';
+    if (percentile >= 21) return '#f2928a';
+    if (percentile >= 16) return '#f07e74';
+    if (percentile >= 11) return '#ee6a5f';
+    if (percentile >= 6) return '#ec564a';
+    return '#ea4335';
+  };
+
+  // Calculate values
+  const overallRecord = calculateRecord(games, false);
+  const conferenceRecord = calculateRecord(games, true);
+  const strengthOfSchedule = calculateStrengthOfSchedule(games, allTeamsRankings);
+  
+  // Get total teams count for percentile calculations
+  const totalTeams = allTeamsRankings ? allTeamsRankings.length : 134;
+
+  // Rating cell component
+  const RatingCell = ({ rating, rank, label }) => (
+    <td style={{
+      padding: '8px 12px',
+      border: '1px solid #dee2e6',
+      textAlign: 'center'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <span style={{
+          fontFamily: 'Consolas, monospace',
+          fontSize: '14px',
+          fontWeight: 'bold'
+        }}>
+          {rating?.toFixed(1) || 'N/A'}
+        </span>
+        <span style={{
+          backgroundColor: getPercentileColor(rank, totalTeams),
+          color: '#000',
+          padding: '2px 6px',
+          borderRadius: '3px',
+          fontSize: '11px',
+          fontWeight: 'bold',
+          fontFamily: 'Consolas, monospace',
+          border: '1px solid rgba(0,0,0,0.1)'
+        }}>
+          #{rank || 'N/A'}
+        </span>
+      </div>
+    </td>
+  );
+
+  return (
+    <div style={{ marginBottom: '30px' }}>
+      <h2 style={{ 
+        borderBottom: '2px solid #dee2e6', 
+        paddingBottom: '10px',
+        fontFamily: '"Trebuchet MS", Arial, sans-serif'
+      }}>
+        2024 Season Summary
+      </h2>
+      
+      <div style={{ marginTop: '16px', overflowX: 'auto' }}>
+        <table style={{
+          width: '100%',
+          maxWidth: '800px',
+          borderCollapse: 'collapse',
+          border: '1px solid #dee2e6',
+          fontFamily: '"Trebuchet MS", Arial, sans-serif'
+        }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f8f9fa' }}>
+              <th style={{
+                padding: '10px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                Overall Record
+              </th>
+              <th style={{
+                padding: '10px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                Conference Record
+              </th>
+              <th style={{
+                padding: '10px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                Overall Rating
+              </th>
+              <th style={{
+                padding: '10px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                Offense Rating
+              </th>
+              <th style={{
+                padding: '10px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                Defense Rating
+              </th>
+              <th style={{
+                padding: '10px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+              }}>
+                Strength of Schedule
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ backgroundColor: '#ffffff' }}>
+              {/* Overall Record */}
+              <td style={{
+                padding: '8px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontFamily: 'Consolas, monospace',
+                fontSize: '16px',
+                fontWeight: 'bold'
+              }}>
+                {overallRecord}
+              </td>
+              
+              {/* Conference Record */}
+              <td style={{
+                padding: '8px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontFamily: 'Consolas, monospace',
+                fontSize: '16px',
+                fontWeight: 'bold'
+              }}>
+                {conferenceRecord}
+              </td>
+              
+              {/* Overall Rating */}
+              <RatingCell 
+                rating={teamData?.power_rating} 
+                rank={teamData?.power_rank}
+                label="Power"
+              />
+              
+              {/* Offense Rating */}
+              <RatingCell 
+                rating={teamData?.offense_rating} 
+                rank={teamData?.offense_rank}
+                label="Offense"
+              />
+              
+              {/* Defense Rating */}
+              <RatingCell 
+                rating={teamData?.defense_rating} 
+                rank={teamData?.defense_rank}
+                label="Defense"
+              />
+              
+              {/* Strength of Schedule */}
+              <td style={{
+                padding: '8px 12px',
+                border: '1px solid #dee2e6',
+                textAlign: 'center',
+                fontFamily: 'Consolas, monospace',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                {strengthOfSchedule ? strengthOfSchedule.toFixed(1) : 'N/A'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div style={{
+        marginTop: '8px',
+        fontSize: '11px',
+        color: '#6c757d',
+        fontStyle: 'italic'
+      }}>
+        <strong>Note:</strong> Strength of Schedule is the average power rating of all opponents played. 
+        Rankings shown with percentile colors (Green = Elite, Red = Poor).
+      </div>
+    </div>
+  );
+};
+
   // 🔧 FIXED: Correct function order in TeamPage component
 
 function TeamPage() {

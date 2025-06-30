@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import HomePage from './HomePage';
+import TeamPage from './TeamPage';
+import SOSLeaderboard from './SOSLeaderboard';
+import LuckLeaderboard from './LuckLeaderboard';
 
 const Navigation = () => {
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -182,15 +186,6 @@ const Navigation = () => {
   );
 };
 
-// 🔧 UPDATE your App.js routing to include the new pages:
-
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Navigation from './Navigation'; // Adjust path as needed
-import HomePage from './HomePage';
-import TeamPage from './TeamPage';
-import SOSLeaderboard from './SOSLeaderboard';
-import LuckLeaderboard from './LuckLeaderboard';
-
 function App() {
   return (
     <Router>
@@ -203,6 +198,7 @@ function App() {
           
           {/* Team Pages */}
           <Route path="/team/:teamName" element={<TeamPage />} />
+          <Route path="/team/:teamName/:season" element={<TeamPage />} />
           
           {/* Games Category */}
           <Route path="/strength-of-schedule" element={<SOSLeaderboard />} />
@@ -226,52 +222,5 @@ function App() {
     </Router>
   );
 }
-
-const mobileStyles = `
-  @media (max-width: 768px) {
-    .cfb-nav-desktop { display: none !important; }
-    .cfb-nav-mobile { display: flex !important; }
-  }
-  @media (min-width: 769px) {
-    .cfb-nav-desktop { display: flex !important; }
-    .cfb-nav-mobile { display: none !important; }
-  }
-`;
-
-// Add mobile navigation component (optional):
-const MobileNavigation = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  return (
-    <div className="cfb-nav-mobile" style={{ display: 'none' }}>
-      {/* Mobile hamburger menu implementation */}
-      <button 
-        onClick={() => setIsMenuOpen(!isMenuOpen)}
-        style={{
-          backgroundColor: 'transparent',
-          border: 'none',
-          color: 'white',
-          fontSize: '20px',
-          padding: '16px'
-        }}
-      >
-        ☰
-      </button>
-      
-      {isMenuOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
-          backgroundColor: '#343a40',
-          border: '1px solid #495057'
-        }}>
-          {/* Mobile menu items */}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default App;

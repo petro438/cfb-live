@@ -764,12 +764,15 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
         </tbody>
       </table>
 
-      {/* Mobile Table - ENHANCED with second header row and tooltips */}
+     // 🔧 Replace your mobile table section with this single-row layout version:
+
+{/* Mobile Table - SINGLE ROW LAYOUT */}
 <div style={{ 
   display: windowWidth < 768 ? 'block' : 'none'
 }}>
   <table style={{ 
     width: '100%', 
+    minWidth: '420px', // ✅ Allow horizontal scrolling for wider content
     borderCollapse: 'collapse', 
     border: '1px solid #dee2e6',
     fontSize: '11px'
@@ -777,23 +780,23 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
     <thead>
       {/* Main header row */}
       <tr style={{ backgroundColor: '#495057' }}>
-        <th style={{...headerStyle, fontSize: '10px', width: '30px', backgroundColor: '#495057', color: '#ffffff'}}>WK</th>
-        <th style={{...headerStyle, fontSize: '10px', width: '50px', backgroundColor: '#495057', color: '#ffffff'}}>OPP</th>
-        <th style={{...headerStyle, fontSize: '10px', width: '50px', backgroundColor: '#495057', color: '#ffffff'}}>SCORE</th>
-        <th style={{...headerStyle, fontSize: '10px', width: '70px', backgroundColor: '#495057', color: '#ffffff'}}>
+        <th style={{...headerStyle, fontSize: '10px', width: '25px', backgroundColor: '#495057', color: '#ffffff'}}>WK</th>
+        <th style={{...headerStyle, fontSize: '10px', width: '75px', backgroundColor: '#495057', color: '#ffffff'}}>OPPONENT</th>
+        <th style={{...headerStyle, fontSize: '10px', width: '65px', backgroundColor: '#495057', color: '#ffffff'}}>SCORE</th>
+        <th style={{...headerStyle, fontSize: '10px', width: '85px', backgroundColor: '#495057', color: '#ffffff'}}>
           WIN %
         </th>
-        <th style={{...headerStyle, fontSize: '10px', width: '45px', backgroundColor: '#495057', color: '#ffffff'}}>OFF</th>
-        <th style={{...headerStyle, fontSize: '10px', width: '45px', backgroundColor: '#495057', color: '#ffffff'}}>DEF</th>
+        <th style={{...headerStyle, fontSize: '10px', width: '55px', backgroundColor: '#495057', color: '#ffffff'}}>OFF</th>
+        <th style={{...headerStyle, fontSize: '10px', width: '55px', backgroundColor: '#495057', color: '#ffffff'}}>DEF</th>
       </tr>
       
-      {/* ✅ NEW: Second header row with PRE/POST and tooltips */}
+      {/* Second header row with PRE/POST */}
       <tr style={{ backgroundColor: '#495057' }}>
         <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
         <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
         <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
         <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
             {/* Pregame tooltip */}
             <Tooltip tooltip="Pregame win probability based on closing moneyline.">
               <span style={{ 
@@ -825,7 +828,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
       </tr>
     </thead>
     <tbody>
-      {/* Rest of mobile table content stays the same... */}
+      {/* Mobile Game Rows - SINGLE ROW LAYOUT */}
       {games
         .filter((game, index, self) => 
           index === self.findIndex(g => g.id === game.id)
@@ -838,13 +841,12 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
           return new Date(a.start_date) - new Date(b.start_date);
         })
         .map((game, index) => {
-          // Same game logic as before...
           const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
           const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
           const isWin = teamScore > opponentScore;
           const isAwayGame = game.home_away === 'away';
           
-          // Calculate pregame probability (same as desktop)
+          // Calculate pregame probability
           let pregameProb = null;
           let debugInfo = 'N/A';
           
@@ -879,27 +881,31 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 </span>
               </td>
               
-              {/* Opponent */}
+              {/* ✅ FIXED: Opponent - Logo and rank SIDE BY SIDE */}
               <td style={{...cellStyle, padding: '4px'}}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    {isAwayGame ? (
-                      <span style={{ color: '#6c757d', fontSize: '8px' }}>@</span>
-                    ) : (
-                      <span style={{ color: '#6c757d', fontSize: '8px' }}>vs</span>
-                    )}
-                    <img 
-                      src={game.opponent_logo || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                      alt={`${game.opponent} logo`}
-                      style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        cursor: 'pointer',
-                        borderRadius: '2px'
-                      }}
-                    />
-                  </div>
-                  {/* Show opponent rank badge on mobile too */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'flex-start', 
+                  gap: '3px',
+                  whiteSpace: 'nowrap' // ✅ Prevent wrapping
+                }}>
+                  {isAwayGame ? (
+                    <span style={{ color: '#6c757d', fontSize: '9px' }}>@</span>
+                  ) : (
+                    <span style={{ color: '#6c757d', fontSize: '9px' }}>vs</span>
+                  )}
+                  <img 
+                    src={game.opponent_logo || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                    alt={`${game.opponent} logo`}
+                    style={{ 
+                      width: '18px', 
+                      height: '18px', 
+                      cursor: 'pointer',
+                      borderRadius: '2px'
+                    }}
+                  />
+                  {/* Opponent rank badge - NEXT TO logo */}
                   {(() => {
                     const rank = getOpponentRank(game.opponent);
                     if (!rank) return null;
@@ -913,7 +919,6 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                         backgroundColor: colors.bg,
                         padding: '1px 3px',
                         borderRadius: '2px',
-                        marginTop: '1px',
                         border: '1px solid rgba(0,0,0,0.1)',
                         minWidth: '16px',
                         textAlign: 'center',
@@ -926,51 +931,63 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 </div>
               </td>
               
-              {/* Score */}
+              {/* ✅ FIXED: Score - Score and W/L ON SAME LINE */}
               <td style={{...cellStyle, fontFamily: '"Courier New", Courier, monospace', fontSize: '11px', fontWeight: 'bold', padding: '4px'}}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', flexDirection: 'column' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '4px',
+                  whiteSpace: 'nowrap' // ✅ Keep on same line
+                }}>
                   <span style={{ color: '#000' }}>
                     {isWin ? `${teamScore}-${opponentScore}` : `${opponentScore}-${teamScore}`}
                   </span>
                   <span style={{
                     color: isWin ? '#28a745' : '#dc3545',
                     fontWeight: 'bold',
-                    fontSize: '12px'
+                    fontSize: '11px'
                   }}>
                     {isWin ? 'W' : 'L'}
                   </span>
                 </div>
               </td>
               
-              {/* Mobile win probability - Enhanced layout */}
+              {/* ✅ FIXED: Win probabilities - SIDE BY SIDE */}
               <td style={{...cellStyle, padding: '2px', fontSize: '10px'}}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-                  {/* Pregame probability - labeled for clarity */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '2px',
+                  whiteSpace: 'nowrap' // ✅ Keep side by side
+                }}>
+                  {/* Pregame probability */}
                   <div style={{
                     backgroundColor: pregameProb ? getProbabilityColor(pregameProb) : '#f8f9fa',
                     color: '#000000',
-                    padding: '1px 2px',
+                    padding: '2px 3px',
                     borderRadius: '2px',
                     fontFamily: '"Courier New", Courier, monospace',
                     fontSize: '9px',
                     fontWeight: 'bold',
-                    minWidth: '20px',
+                    minWidth: '25px',
                     textAlign: 'center',
                     lineHeight: '1',
                     border: '1px solid rgba(0,0,0,0.1)'
                   }}>
                     {debugInfo}
                   </div>
-                  {/* Postgame probability - labeled for clarity */}
+                  {/* Postgame probability */}
                   <div style={{
                     backgroundColor: postgameProb ? getProbabilityColor(postgameProb) : '#f8f9fa',
                     color: '#000000',
-                    padding: '1px 2px',
+                    padding: '2px 3px',
                     borderRadius: '2px',
                     fontFamily: '"Courier New", Courier, monospace',
                     fontSize: '9px',
                     fontWeight: 'bold',
-                    minWidth: '20px',
+                    minWidth: '25px',
                     textAlign: 'center',
                     lineHeight: '1',
                     border: '1px solid rgba(0,0,0,0.1)'
@@ -980,11 +997,11 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 </div>
               </td>
               
-              {/* Mobile offense PPA - with colors */}
+              {/* ✅ ENHANCED: Mobile offense PPA - BIGGER FONT */}
               <td style={{
                 ...cellStyle, 
-                padding: '2px', 
-                fontSize: '10px',
+                padding: '4px', 
+                fontSize: '12px', // ✅ Bigger font (was 10px)
                 backgroundColor: getPPAColor(parseFloat(game.offense_ppa), false),
                 fontFamily: '"Courier New", Courier, monospace',
                 fontWeight: 'bold',
@@ -993,11 +1010,11 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 {game.offense_ppa ? parseFloat(game.offense_ppa).toFixed(2) : 'N/A'}
               </td>
               
-              {/* Mobile defense PPA - with colors */}
+              {/* ✅ ENHANCED: Mobile defense PPA - BIGGER FONT */}
               <td style={{
                 ...cellStyle, 
-                padding: '2px', 
-                fontSize: '10px',
+                padding: '4px', 
+                fontSize: '12px', // ✅ Bigger font (was 10px)
                 backgroundColor: getPPAColor(parseFloat(game.defense_ppa), true),
                 fontFamily: '"Courier New", Courier, monospace',
                 fontWeight: 'bold',
@@ -1009,7 +1026,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
           );
         })}
 
-      {/* Mobile Season Totals Row - Enhanced with tooltips for expected wins */}
+      {/* ✅ FIXED: Mobile Season Totals Row - SIDE BY SIDE layout */}
       <tr style={{ 
         backgroundColor: '#e9ecef', 
         borderTop: '3px solid #495057',
@@ -1024,9 +1041,15 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
         <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '11px', fontWeight: 'bold', padding: '4px'}}>
           {seasonTotals.record}
         </td>
-        {/* Mobile expected wins with conditional formatting and tooltips */}
+        {/* Mobile expected wins - SIDE BY SIDE with tooltips */}
         <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '9px', padding: '2px'}}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '2px',
+            whiteSpace: 'nowrap' // ✅ Keep side by side
+          }}>
             {/* Pregame expected wins with tooltip */}
             <Tooltip tooltip="Sum of pregame win probabilities - shows expected wins based on betting markets">
               <div style={{
@@ -1042,12 +1065,12 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                   if (isNaN(expectedPre)) return '#495057';
                   return actualWins > expectedPre ? '#155724' : actualWins < expectedPre ? '#721c24' : '#495057';
                 })(),
-                padding: '1px 2px',
+                padding: '2px 3px',
                 borderRadius: '2px',
                 fontFamily: '"Courier New", Courier, monospace',
                 fontSize: '9px',
                 fontWeight: 'bold',
-                minWidth: '20px',
+                minWidth: '25px',
                 textAlign: 'center',
                 lineHeight: '1',
                 cursor: 'help',
@@ -1071,12 +1094,12 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                   if (isNaN(expectedPost)) return '#495057';
                   return actualWins > expectedPost ? '#155724' : actualWins < expectedPost ? '#721c24' : '#495057';
                 })(),
-                padding: '1px 2px',
+                padding: '2px 3px',
                 borderRadius: '2px',
                 fontFamily: '"Courier New", Courier, monospace',
                 fontSize: '9px',
                 fontWeight: 'bold',
-                minWidth: '20px',
+                minWidth: '25px',
                 textAlign: 'center',
                 lineHeight: '1',
                 cursor: 'help',
@@ -1087,10 +1110,10 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
             </Tooltip>
           </div>
         </td>
-        <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '9px', padding: '4px'}}>
+        <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '10px', padding: '4px', fontWeight: 'bold'}}>
           {seasonTotals.seasonOffensePPA}
         </td>
-        <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '9px', padding: '4px'}}>
+        <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '10px', padding: '4px', fontWeight: 'bold'}}>
           {seasonTotals.seasonDefensePPA}
         </td>
       </tr>

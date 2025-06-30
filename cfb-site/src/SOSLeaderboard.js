@@ -580,22 +580,6 @@ useEffect(() => {
       {/* ✅ Hide sort arrows on mobile */}
       <span className="sort-arrow-desktop">{getSortArrow('team')}</span>
     </th>
-    
-<Link 
-  to={`/team/${encodeURIComponent(team.team)}?season=${selectedSeason}`}
-  style={{ 
-    textDecoration: 'none', 
-    color: '#007bff',
-    fontWeight: 'bold',
-    textTransform: 'uppercase'
-  }}
->
-  <span className="team-name-desktop">{team.team}</span>
-  <span className="team-name-mobile" style={{ display: 'none' }}>
-    {team.abbreviation || team.team}
-  </span>
-</Link>
-
           <th 
             style={{ 
               padding: '8px 4px', 

@@ -10,8 +10,8 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors({
   origin: [
-    'https://cfbsite-production.up.railway.app',
-    'http://localhost:3000'
+    'https://cfbsite-production.up.railway.app',  // Your frontend domain
+    'http://localhost:3000'                       // Local development
   ],
   credentials: true
 }));

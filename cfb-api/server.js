@@ -4,9 +4,6 @@ const path = require('path');
 require('dotenv').config({ path: './dataconfig.env' });
 const { Pool } = require('pg');
 
-const compression = require('compression');
-app.use(compression());
-
 const app = express();
 const port = process.env.PORT || 5000;
 

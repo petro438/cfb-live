@@ -314,28 +314,28 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
       }}>
         
         <thead>
-          <tr style={{ backgroundColor: '#f8f9fa' }}>
-            <th style={headerStyle}>WK</th>
-            <th style={headerStyle}>OPPONENT</th>
-            <th style={headerStyle}>SCORE</th>
-            <th style={headerStyle}>WIN PROBABILITY</th>
-            <th style={headerStyle}>OFF PPA</th>
-            <th style={headerStyle}>DEF PPA</th>
-          </tr>
-          <tr style={{ backgroundColor: '#f8f9fa' }}>
-            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}>
-              <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                <span>Pre</span>
-                <span>Post</span>
-              </div>
-            </th>
-            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-          </tr>
-        </thead>
+                  <tr style={{ backgroundColor: '#495057' }}>
+                    <th style={{...headerStyle, backgroundColor: '#495057', color: '#ffffff'}}>WK</th>
+                    <th style={{...headerStyle, backgroundColor: '#495057', color: '#ffffff'}}>OPPONENT</th>
+                    <th style={{...headerStyle, backgroundColor: '#495057', color: '#ffffff'}}>SCORE</th>
+                    <th style={{...headerStyle, backgroundColor: '#495057', color: '#ffffff'}}>WIN PROBABILITY</th>
+                    <th style={{...headerStyle, backgroundColor: '#495057', color: '#ffffff'}}>OFF PPA</th>
+                    <th style={{...headerStyle, backgroundColor: '#495057', color: '#ffffff'}}>DEF PPA</th>
+                  </tr>
+                  <tr style={{ backgroundColor: '#495057' }}>
+                    <th style={{...headerStyle, fontSize: '10px', color: '#ffffff', backgroundColor: '#495057'}}></th>
+                    <th style={{...headerStyle, fontSize: '10px', color: '#ffffff', backgroundColor: '#495057'}}></th>
+                    <th style={{...headerStyle, fontSize: '10px', color: '#ffffff', backgroundColor: '#495057'}}></th>
+                    <th style={{...headerStyle, fontSize: '10px', color: '#ffffff', backgroundColor: '#495057'}}>
+                      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                        <span>Pre</span>
+                        <span>Post</span>
+                      </div>
+                    </th>
+                    <th style={{...headerStyle, fontSize: '10px', color: '#ffffff', backgroundColor: '#495057'}}></th>
+                    <th style={{...headerStyle, fontSize: '10px', color: '#ffffff', backgroundColor: '#495057'}}></th>
+                  </tr>
+            </thead>
         <tbody>
           
           
@@ -530,95 +530,159 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
               );
             })}
 
-          {/* Season Totals Row */}
-          <tr style={{ 
-            backgroundColor: '#e9ecef', 
-            borderTop: '3px solid #495057',
-            fontWeight: 'bold'
-          }}>
-            <td style={{
-              ...cellStyle,
-              backgroundColor: '#495057',
-              color: '#ffffff',
-              fontWeight: 'bold',
-              textAlign: 'center'
-            }}>
-              SEASON
-            </td>
-            <td style={{
-              ...cellStyle,
-              backgroundColor: '#495057',
-              color: '#ffffff',
-              fontWeight: 'bold',
-              textAlign: 'center'
-            }}>
-              TOTALS
-            </td>
-            <td style={{
-              ...cellStyle,
-              backgroundColor: '#e9ecef',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              color: '#495057'
-            }}>
-              {seasonTotals.record}
-            </td>
-            <td style={{...cellStyle, backgroundColor: '#e9ecef', padding: '4px'}}>
-              // ... win probability stuff
-            </td>
-            
-            // 🎯 FIND THESE TWO PPA CELLS:
-            <td style={{
-              ...cellStyle,
-              backgroundColor: '#e9ecef',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontWeight: 'bold',
-              color: '#495057',
-              fontSize: '15px'
-            }}>
-              <td style={{
-              ...cellStyle,
-              backgroundColor: '#e9ecef',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontWeight: 'bold',
-              color: '#495057',
-              fontSize: '13px',
-              textAlign: 'center'
-            }}>
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div style={{ fontSize: '15px', lineHeight: '1' }}>
-                  {seasonTotals.seasonOffensePPA}
-                </div>
-                {(() => {
-                  const ranking = getPPARanking(
-                    seasonTotals.seasonOffensePPA, 
-                    'offense_ppa', 
-                    allTeamsAdvancedStats, 
-                    false
-                  );
-                  return ranking ? (
-                    <div style={{
-                      fontSize: '10px',
-                      fontWeight: 'normal',
-                      opacity: 0.8,
-                      marginTop: '2px',
-                      lineHeight: '1'
-                    }}>
-                      #{ranking.rank}
+              {/* Season Totals Row - FIXED VERSION */}
+                <tr style={{ 
+                  backgroundColor: '#e9ecef', 
+                  borderTop: '3px solid #495057',
+                  fontWeight: 'bold'
+                }}>
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: '#495057',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    textAlign: 'center'
+                  }}>
+                    SEASON
+                  </td>
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: '#495057',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    textAlign: 'center'
+                  }}>
+                    TOTALS
+                  </td>
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: '#e9ecef',
+                    fontFamily: '"Courier New", Courier, monospace',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#495057'
+                  }}>
+                    {seasonTotals.record}
+                  </td>
+                  
+                  {/* ✅ FIXED: Win Probability Cell */}
+                  <td style={{...cellStyle, backgroundColor: '#e9ecef', padding: '4px'}}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px' }}>
+                      <div style={{
+                        backgroundColor: '#f8f9fa',
+                        color: '#495057',
+                        padding: '2px 4px',
+                        borderRadius: '0px',
+                        fontFamily: '"Courier New", Courier, monospace',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        minWidth: '28px',
+                        textAlign: 'center',
+                        border: 'none',
+                        lineHeight: '1'
+                      }}>
+                        {seasonTotals.expectedWinsPre}
+                      </div>
+                      <div style={{
+                        backgroundColor: '#f8f9fa',
+                        color: '#495057',
+                        padding: '2px 4px',
+                        borderRadius: '0px',
+                        fontFamily: '"Courier New", Courier, monospace',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        minWidth: '32px',
+                        textAlign: 'center',
+                        border: 'none',
+                        lineHeight: '1'
+                      }}>
+                        {seasonTotals.expectedWinsPost}
+                      </div>
                     </div>
-                  ) : null;
-                })()}
-              </div>
-            </td>
-              {seasonTotals.seasonDefensePPA}
-            </td>
-          </tr>
+                  </td>
+                  
+                  {/* ✅ FIXED: Offensive PPA Cell */}
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: '#e9ecef',
+                    fontFamily: '"Courier New", Courier, monospace',
+                    fontWeight: 'bold',
+                    color: '#495057',
+                    fontSize: '13px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <div style={{ fontSize: '15px', lineHeight: '1' }}>
+                        {seasonTotals.seasonOffensePPA}
+                      </div>
+                      {(() => {
+                        const ranking = getPPARanking(
+                          seasonTotals.seasonOffensePPA, 
+                          'offense_ppa', 
+                          allTeamsAdvancedStats, 
+                          false
+                        );
+                        return ranking ? (
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: 'normal',
+                            opacity: 0.8,
+                            marginTop: '2px',
+                            lineHeight: '1'
+                          }}>
+                            #{ranking.rank}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  </td>
+                  
+                  {/* ✅ FIXED: Defensive PPA Cell */}
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: '#e9ecef',
+                    fontFamily: '"Courier New", Courier, monospace',
+                    fontWeight: 'bold',
+                    color: '#495057',
+                    fontSize: '13px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <div style={{ fontSize: '15px', lineHeight: '1' }}>
+                        {seasonTotals.seasonDefensePPA}
+                      </div>
+                      {(() => {
+                        const ranking = getPPARanking(
+                          seasonTotals.seasonDefensePPA, 
+                          'defense_ppa', 
+                          allTeamsAdvancedStats, 
+                          true  // ✅ true for defense
+                        );
+                        return ranking ? (
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: 'normal',
+                            opacity: 0.8,
+                            marginTop: '2px',
+                            lineHeight: '1'
+                          }}>
+                            #{ranking.rank}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  </td>
+                </tr>
         </tbody>
       </table>
 
@@ -633,15 +697,15 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
           fontSize: '11px'
         }}>
           <thead>
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th style={{...headerStyle, fontSize: '10px', width: '30px'}}>WK</th>
-              <th style={{...headerStyle, fontSize: '10px', width: '50px'}}>OPP</th>
-              <th style={{...headerStyle, fontSize: '10px', width: '50px'}}>SCORE</th>
-              <th style={{...headerStyle, fontSize: '10px', width: '70px'}}>WIN %</th>
-              <th style={{...headerStyle, fontSize: '10px', width: '45px'}}>OFF</th>
-              <th style={{...headerStyle, fontSize: '10px', width: '45px'}}>DEF</th>
-            </tr>
-          </thead>
+                <tr style={{ backgroundColor: '#495057' }}>
+                  <th style={{...headerStyle, fontSize: '10px', width: '30px', backgroundColor: '#495057', color: '#ffffff'}}>WK</th>
+                  <th style={{...headerStyle, fontSize: '10px', width: '50px', backgroundColor: '#495057', color: '#ffffff'}}>OPP</th>
+                  <th style={{...headerStyle, fontSize: '10px', width: '50px', backgroundColor: '#495057', color: '#ffffff'}}>SCORE</th>
+                  <th style={{...headerStyle, fontSize: '10px', width: '70px', backgroundColor: '#495057', color: '#ffffff'}}>WIN %</th>
+                  <th style={{...headerStyle, fontSize: '10px', width: '45px', backgroundColor: '#495057', color: '#ffffff'}}>OFF</th>
+                  <th style={{...headerStyle, fontSize: '10px', width: '45px', backgroundColor: '#495057', color: '#ffffff'}}>DEF</th>
+                </tr>
+              </thead>
           <tbody>
             {/* Same game rows as desktop but mobile-optimized */}
             {games
@@ -1308,43 +1372,141 @@ const VerticalSeasonSummary = ({ teamData, games, allTeamsRankings }) => {
 
   // Calculate strength of schedule from games played
   const calculateStrengthOfSchedule = (games, allTeamsRankings) => {
-    if (!games || !allTeamsRankings || games.length === 0) return null;
-    
-    let totalRating = 0;
-    let gamesCount = 0;
-    
-    games.forEach(game => {
-      if (game.completed && game.opponent) {
-        // Find opponent's power rating
-        const opponent = allTeamsRankings.find(team => 
-          team.team_name === game.opponent || 
-          team.school === game.opponent
-        );
+  if (!games || !allTeamsRankings || games.length === 0) return null;
+  
+  console.log('🔍 SOS Calculation Debug:', {
+    gamesCount: games.length,
+    rankingsCount: allTeamsRankings.length,
+    firstRanking: allTeamsRankings[0]?.team_name,
+    firstGame: games[0]?.opponent
+  });
+  
+  let totalRating = 0;
+  let gamesCount = 0;
+  const debugOpponents = [];
+  
+  games.forEach(game => {
+    if (game.completed && game.opponent) {
+      // Try multiple matching strategies for opponent names
+      const opponent = allTeamsRankings.find(team => {
+        const rankingTeamName = team.team_name || team.teamName || team.school;
+        const gameOpponent = game.opponent;
         
-        if (opponent && opponent.power_rating) {
-          totalRating += parseFloat(opponent.power_rating);
+        if (!rankingTeamName || !gameOpponent) return false;
+        
+        // Strategy 1: Exact match
+        if (rankingTeamName === gameOpponent) return true;
+        
+        // Strategy 2: Case insensitive
+        if (rankingTeamName.toLowerCase() === gameOpponent.toLowerCase()) return true;
+        
+        // Strategy 3: Trim whitespace and match
+        if (rankingTeamName.trim().toLowerCase() === gameOpponent.trim().toLowerCase()) return true;
+        
+        // Strategy 4: Handle common name variations
+        const normalizeTeamName = (name) => {
+          return name.toLowerCase()
+            .replace(/\s+/g, ' ')
+            .replace('&', 'and')
+            .replace('.', '')
+            .trim();
+        };
+        
+        if (normalizeTeamName(rankingTeamName) === normalizeTeamName(gameOpponent)) return true;
+        
+        return false;
+      });
+      
+      if (opponent) {
+        const rating = parseFloat(opponent.power_rating || opponent.powerRating);
+        if (!isNaN(rating)) {
+          totalRating += rating;
           gamesCount++;
+          debugOpponents.push({
+            opponent: game.opponent,
+            rating: rating.toFixed(1),
+            matched: opponent.team_name || opponent.teamName,
+            found: true
+          });
+        } else {
+          debugOpponents.push({
+            opponent: game.opponent,
+            rating: 'No rating',
+            matched: opponent.team_name || opponent.teamName,
+            found: false
+          });
         }
+      } else {
+        debugOpponents.push({
+          opponent: game.opponent,
+          rating: 'Not found',
+          matched: null,
+          found: false
+        });
       }
-    });
-    
-    return gamesCount > 0 ? totalRating / gamesCount : null;
-  };
-
-  // Calculate SOS ranking among all teams (simplified)
-  const calculateSOSRank = (strengthOfSchedule, allTeamsRankings) => {
-    if (!strengthOfSchedule || !allTeamsRankings) return null;
-    
-    // Simple ranking based on SOS value vs average
-    const avgSOS = 0; // You could calculate this more precisely
-    const totalTeams = allTeamsRankings.length;
-    
-    if (strengthOfSchedule > avgSOS) {
-      return Math.ceil(totalTeams * 0.3); // Top 30% for above average SOS
-    } else {
-      return Math.ceil(totalTeams * 0.7); // Bottom 70% for below average SOS
     }
-  };
+  });
+  
+  console.log('🎯 SOS Opponent Matching:', debugOpponents);
+  console.log('📊 SOS Summary:', {
+    totalRating: totalRating.toFixed(1),
+    gamesCount,
+    averageSOS: gamesCount > 0 ? (totalRating / gamesCount).toFixed(1) : 'N/A',
+    foundRate: `${gamesCount}/${games.filter(g => g.completed).length}`
+  });
+  
+  return gamesCount > 0 ? totalRating / gamesCount : null;
+};
+
+  // Replace the calculateSOSRank function:
+
+const calculateSOSRank = (strengthOfSchedule, allTeamsRankings, games) => {
+  if (!strengthOfSchedule || !allTeamsRankings) return null;
+  
+  // Calculate SOS for all teams (simplified approach)
+  // In a real implementation, you'd calculate SOS for every team and rank them
+  
+  // Get the range of power ratings to understand the scale
+  const powerRatings = allTeamsRankings
+    .map(team => parseFloat(team.power_rating || team.powerRating))
+    .filter(rating => !isNaN(rating));
+  
+  const avgRating = powerRatings.reduce((sum, rating) => sum + rating, 0) / powerRatings.length;
+  const maxRating = Math.max(...powerRatings);
+  const minRating = Math.min(...powerRatings);
+  
+  console.log('📈 SOS Ranking Context:', {
+    teamSOS: strengthOfSchedule.toFixed(1),
+    avgRating: avgRating.toFixed(1),
+    maxRating: maxRating.toFixed(1),
+    minRating: minRating.toFixed(1),
+    percentileVsAvg: ((strengthOfSchedule - avgRating) / (maxRating - minRating) * 100).toFixed(1) + '%'
+  });
+  
+  // Calculate percentile ranking based on SOS vs average
+  const sosDiff = strengthOfSchedule - avgRating;
+  const totalTeams = allTeamsRankings.length;
+  
+  // Convert SOS difference to a ranking (higher SOS = harder schedule = better rank)
+  let percentile;
+  if (sosDiff > 15) percentile = 95;      // Top 5% - very hard schedule
+  else if (sosDiff > 10) percentile = 85; // Top 15% - hard schedule  
+  else if (sosDiff > 5) percentile = 70;  // Top 30% - above average
+  else if (sosDiff > 0) percentile = 55;  // Above average
+  else if (sosDiff > -5) percentile = 40; // Below average
+  else if (sosDiff > -10) percentile = 25; // Easy schedule
+  else percentile = 10;                    // Very easy schedule
+  
+  const rank = Math.ceil((100 - percentile) / 100 * totalTeams);
+  
+  console.log('🏆 Final SOS Rank:', {
+    percentile: percentile + '%',
+    rank: rank,
+    interpretation: rank <= 20 ? 'Very Hard' : rank <= 40 ? 'Hard' : rank <= 80 ? 'Average' : 'Easy'
+  });
+  
+  return rank;
+};
 
   // Get percentile color for ratings
   const getPercentileColor = (rank, total) => {
@@ -1861,7 +2023,7 @@ function TeamPage() {
         fetch(gamesUrl),
         fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
         fetch(`${API_URL}/api/all-advanced-stats/2024`),
-        fetch(`${API_URL}/api/power-rankings?season=2025`)
+        fetch(`${API_URL}/api/power-rankings?season=2024`)
       ]);
 
       console.log('📊 API responses:', {

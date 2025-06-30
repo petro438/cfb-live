@@ -136,9 +136,7 @@
     lineHeight: '1.2'
   };
 
-  // 🔧 Also update the Tooltip component to work better on mobile (add this if you don't have it):
-
-const Tooltip = ({ children, tooltip }) => {
+  const Tooltip = ({ children, tooltip }) => {
   const [showTooltip, setShowTooltip] = React.useState(false);
   
   if (!tooltip) return children;
@@ -148,13 +146,13 @@ const Tooltip = ({ children, tooltip }) => {
       style={{ position: 'relative', display: 'inline-block' }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      onClick={() => setShowTooltip(!showTooltip)} // ✅ ADD: Click toggle for mobile
+      onClick={() => setShowTooltip(!showTooltip)} // Click toggle for mobile
     >
       {children}
       {showTooltip && (
         <div style={{
           position: 'absolute',
-          bottom: '100%',
+          top: '100%', // ✅ CHANGED: Show BELOW instead of above
           left: '50%',
           transform: 'translateX(-50%)',
           backgroundColor: '#333',
@@ -163,25 +161,26 @@ const Tooltip = ({ children, tooltip }) => {
           borderRadius: '6px',
           fontSize: '11px',
           lineHeight: '1.3',
-          maxWidth: '200px', // ✅ SMALLER for mobile
+          maxWidth: '200px',
           textAlign: 'left',
           zIndex: 1000,
           boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          marginBottom: '5px',
-          whiteSpace: 'normal', // ✅ Allow text wrapping
+          marginTop: '5px', // ✅ CHANGED: margin below instead of above
+          whiteSpace: 'normal',
           wordWrap: 'break-word'
         }}>
           {tooltip}
+          {/* ✅ CHANGED: Arrow now points UP (tooltip is below) */}
           <div style={{
             position: 'absolute',
-            top: '100%',
+            bottom: '100%', // ✅ CHANGED: Arrow at bottom of tooltip
             left: '50%',
             transform: 'translateX(-50%)',
             width: 0,
             height: 0,
             borderLeft: '5px solid transparent',
             borderRight: '5px solid transparent',
-            borderTop: '5px solid #333'
+            borderBottom: '5px solid #333' // ✅ CHANGED: Border bottom (pointing up)
           }} />
         </div>
       )}
@@ -639,7 +638,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                             padding: '2px 4px',
                             borderRadius: '0px',
                             fontFamily: '"Courier New", Courier, monospace',
-                            fontSize: '11px',
+                            fontSize: '13px',
                             fontWeight: 'bold',
                             minWidth: '28px',
                             textAlign: 'center',
@@ -763,8 +762,6 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 </tr>
         </tbody>
       </table>
-
-     // 🔧 Replace your mobile table section with this single-row layout version:
 
 {/* Mobile Table - SINGLE ROW LAYOUT */}
 <div style={{ 

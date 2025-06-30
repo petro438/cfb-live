@@ -2019,7 +2019,7 @@ function TeamPage() {
       console.log('🔍 Games URL:', gamesUrl);
       
       const [teamResponse, gamesResponse, statsResponse, allAdvancedStatsResponse, rankingsResponse] = await Promise.all([
-        fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?season=2025`),
+        fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}?season=2024`),
         fetch(gamesUrl),
         fetch(`${API_URL}/api/teams/${encodeURIComponent(teamName)}/stats?season=2024`),
         fetch(`${API_URL}/api/all-advanced-stats/2024`),

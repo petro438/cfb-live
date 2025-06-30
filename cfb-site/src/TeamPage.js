@@ -136,6 +136,59 @@
     lineHeight: '1.2'
   };
 
+  // 🔧 Also update the Tooltip component to work better on mobile (add this if you don't have it):
+
+const Tooltip = ({ children, tooltip }) => {
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  
+  if (!tooltip) return children;
+  
+  return (
+    <div 
+      style={{ position: 'relative', display: 'inline-block' }}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => setShowTooltip(!showTooltip)} // ✅ ADD: Click toggle for mobile
+    >
+      {children}
+      {showTooltip && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: '#333',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '11px',
+          lineHeight: '1.3',
+          maxWidth: '200px', // ✅ SMALLER for mobile
+          textAlign: 'left',
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          marginBottom: '5px',
+          whiteSpace: 'normal', // ✅ Allow text wrapping
+          wordWrap: 'break-word'
+        }}>
+          {tooltip}
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: '5px solid #333'
+          }} />
+        </div>
+      )}
+    </div>
+  );
+};
+
   // Replace your existing CompletedGamesTable component with this enhanced version:
 
 // ADD THIS FUNCTION at the top of your EnhancedCompletedGamesTable component
@@ -711,7 +764,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
         </tbody>
       </table>
 
-      {/* Mobile Table - ENHANCED VERSION */}
+      {/* Mobile Table - ENHANCED with second header row and tooltips */}
 <div style={{ 
   display: windowWidth < 768 ? 'block' : 'none'
 }}>
@@ -722,17 +775,57 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
     fontSize: '11px'
   }}>
     <thead>
+      {/* Main header row */}
       <tr style={{ backgroundColor: '#495057' }}>
         <th style={{...headerStyle, fontSize: '10px', width: '30px', backgroundColor: '#495057', color: '#ffffff'}}>WK</th>
         <th style={{...headerStyle, fontSize: '10px', width: '50px', backgroundColor: '#495057', color: '#ffffff'}}>OPP</th>
         <th style={{...headerStyle, fontSize: '10px', width: '50px', backgroundColor: '#495057', color: '#ffffff'}}>SCORE</th>
-        <th style={{...headerStyle, fontSize: '10px', width: '70px', backgroundColor: '#495057', color: '#ffffff'}}>WIN %</th>
+        <th style={{...headerStyle, fontSize: '10px', width: '70px', backgroundColor: '#495057', color: '#ffffff'}}>
+          WIN %
+        </th>
         <th style={{...headerStyle, fontSize: '10px', width: '45px', backgroundColor: '#495057', color: '#ffffff'}}>OFF</th>
         <th style={{...headerStyle, fontSize: '10px', width: '45px', backgroundColor: '#495057', color: '#ffffff'}}>DEF</th>
       </tr>
+      
+      {/* ✅ NEW: Second header row with PRE/POST and tooltips */}
+      <tr style={{ backgroundColor: '#495057' }}>
+        <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
+        <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
+        <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
+        <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+            {/* Pregame tooltip */}
+            <Tooltip tooltip="Pregame win probability based on closing moneyline.">
+              <span style={{ 
+                cursor: 'help',
+                fontSize: '8px',
+                fontWeight: 'bold',
+                color: '#ffffff',
+                textDecoration: 'underline dotted'
+              }}>
+                PRE
+              </span>
+            </Tooltip>
+            {/* Postgame tooltip */}
+            <Tooltip tooltip="Postgame win probability attempts to remove luck and determine how often a team would win if the game was played an infinite number of times with equal luck on both sides.">
+              <span style={{ 
+                cursor: 'help',
+                fontSize: '8px',
+                fontWeight: 'bold',
+                color: '#ffffff',
+                textDecoration: 'underline dotted'
+              }}>
+                POST
+              </span>
+            </Tooltip>
+          </div>
+        </th>
+        <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
+        <th style={{...headerStyle, fontSize: '8px', backgroundColor: '#495057', color: '#ffffff'}}></th>
+      </tr>
     </thead>
     <tbody>
-      {/* Mobile Game Rows with FULL formatting */}
+      {/* Rest of mobile table content stays the same... */}
       {games
         .filter((game, index, self) => 
           index === self.findIndex(g => g.id === game.id)
@@ -745,7 +838,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
           return new Date(a.start_date) - new Date(b.start_date);
         })
         .map((game, index) => {
-          // Same game logic as desktop
+          // Same game logic as before...
           const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
           const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
           const isWin = teamScore > opponentScore;
@@ -849,10 +942,10 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 </div>
               </td>
               
-              {/* Mobile win probability - FIXED */}
+              {/* Mobile win probability - Enhanced layout */}
               <td style={{...cellStyle, padding: '2px', fontSize: '10px'}}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-                  {/* Pregame probability */}
+                  {/* Pregame probability - labeled for clarity */}
                   <div style={{
                     backgroundColor: pregameProb ? getProbabilityColor(pregameProb) : '#f8f9fa',
                     color: '#000000',
@@ -863,11 +956,12 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                     fontWeight: 'bold',
                     minWidth: '20px',
                     textAlign: 'center',
-                    lineHeight: '1'
+                    lineHeight: '1',
+                    border: '1px solid rgba(0,0,0,0.1)'
                   }}>
                     {debugInfo}
                   </div>
-                  {/* Postgame probability */}
+                  {/* Postgame probability - labeled for clarity */}
                   <div style={{
                     backgroundColor: postgameProb ? getProbabilityColor(postgameProb) : '#f8f9fa',
                     color: '#000000',
@@ -878,14 +972,15 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                     fontWeight: 'bold',
                     minWidth: '20px',
                     textAlign: 'center',
-                    lineHeight: '1'
+                    lineHeight: '1',
+                    border: '1px solid rgba(0,0,0,0.1)'
                   }}>
                     {postgameProb ? `${Math.round(postgameProb * 100)}%` : 'N/A'}
                   </div>
                 </div>
               </td>
               
-              {/* Mobile offense PPA - FIXED with colors */}
+              {/* Mobile offense PPA - with colors */}
               <td style={{
                 ...cellStyle, 
                 padding: '2px', 
@@ -898,7 +993,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
                 {game.offense_ppa ? parseFloat(game.offense_ppa).toFixed(2) : 'N/A'}
               </td>
               
-              {/* Mobile defense PPA - FIXED with colors */}
+              {/* Mobile defense PPA - with colors */}
               <td style={{
                 ...cellStyle, 
                 padding: '2px', 
@@ -914,7 +1009,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
           );
         })}
 
-      {/* Mobile Season Totals Row - ENHANCED */}
+      {/* Mobile Season Totals Row - Enhanced with tooltips for expected wins */}
       <tr style={{ 
         backgroundColor: '#e9ecef', 
         borderTop: '3px solid #495057',
@@ -929,59 +1024,67 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
         <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '11px', fontWeight: 'bold', padding: '4px'}}>
           {seasonTotals.record}
         </td>
-        {/* Mobile expected wins with conditional formatting */}
+        {/* Mobile expected wins with conditional formatting and tooltips */}
         <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '9px', padding: '2px'}}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-            {/* Pregame expected wins */}
-            <div style={{
-              backgroundColor: (() => {
-                const expectedPre = parseFloat(seasonTotals.expectedWinsPre);
-                const actualWins = seasonTotals.actualWins;
-                if (isNaN(expectedPre)) return '#f8f9fa';
-                return actualWins > expectedPre ? '#d4edda' : actualWins < expectedPre ? '#f8d7da' : '#f8f9fa';
-              })(),
-              color: (() => {
-                const expectedPre = parseFloat(seasonTotals.expectedWinsPre);
-                const actualWins = seasonTotals.actualWins;
-                if (isNaN(expectedPre)) return '#495057';
-                return actualWins > expectedPre ? '#155724' : actualWins < expectedPre ? '#721c24' : '#495057';
-              })(),
-              padding: '1px 2px',
-              borderRadius: '2px',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontSize: '9px',
-              fontWeight: 'bold',
-              minWidth: '20px',
-              textAlign: 'center',
-              lineHeight: '1'
-            }}>
-              {seasonTotals.expectedWinsPre}
-            </div>
-            {/* Postgame expected wins */}
-            <div style={{
-              backgroundColor: (() => {
-                const expectedPost = parseFloat(seasonTotals.expectedWinsPost);
-                const actualWins = seasonTotals.actualWins;
-                if (isNaN(expectedPost)) return '#f8f9fa';
-                return actualWins > expectedPost ? '#d4edda' : actualWins < expectedPost ? '#f8d7da' : '#f8f9fa';
-              })(),
-              color: (() => {
-                const expectedPost = parseFloat(seasonTotals.expectedWinsPost);
-                const actualWins = seasonTotals.actualWins;
-                if (isNaN(expectedPost)) return '#495057';
-                return actualWins > expectedPost ? '#155724' : actualWins < expectedPost ? '#721c24' : '#495057';
-              })(),
-              padding: '1px 2px',
-              borderRadius: '2px',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontSize: '9px',
-              fontWeight: 'bold',
-              minWidth: '20px',
-              textAlign: 'center',
-              lineHeight: '1'
-            }}>
-              {seasonTotals.expectedWinsPost}
-            </div>
+            {/* Pregame expected wins with tooltip */}
+            <Tooltip tooltip="Sum of pregame win probabilities - shows expected wins based on betting markets">
+              <div style={{
+                backgroundColor: (() => {
+                  const expectedPre = parseFloat(seasonTotals.expectedWinsPre);
+                  const actualWins = seasonTotals.actualWins;
+                  if (isNaN(expectedPre)) return '#f8f9fa';
+                  return actualWins > expectedPre ? '#d4edda' : actualWins < expectedPre ? '#f8d7da' : '#f8f9fa';
+                })(),
+                color: (() => {
+                  const expectedPre = parseFloat(seasonTotals.expectedWinsPre);
+                  const actualWins = seasonTotals.actualWins;
+                  if (isNaN(expectedPre)) return '#495057';
+                  return actualWins > expectedPre ? '#155724' : actualWins < expectedPre ? '#721c24' : '#495057';
+                })(),
+                padding: '1px 2px',
+                borderRadius: '2px',
+                fontFamily: '"Courier New", Courier, monospace',
+                fontSize: '9px',
+                fontWeight: 'bold',
+                minWidth: '20px',
+                textAlign: 'center',
+                lineHeight: '1',
+                cursor: 'help',
+                border: '1px solid rgba(0,0,0,0.1)'
+              }}>
+                {seasonTotals.expectedWinsPre}
+              </div>
+            </Tooltip>
+            {/* Postgame expected wins with tooltip */}
+            <Tooltip tooltip="Sum of postgame win probabilities - shows deserved wins based on actual performance">
+              <div style={{
+                backgroundColor: (() => {
+                  const expectedPost = parseFloat(seasonTotals.expectedWinsPost);
+                  const actualWins = seasonTotals.actualWins;
+                  if (isNaN(expectedPost)) return '#f8f9fa';
+                  return actualWins > expectedPost ? '#d4edda' : actualWins < expectedPost ? '#f8d7da' : '#f8f9fa';
+                })(),
+                color: (() => {
+                  const expectedPost = parseFloat(seasonTotals.expectedWinsPost);
+                  const actualWins = seasonTotals.actualWins;
+                  if (isNaN(expectedPost)) return '#495057';
+                  return actualWins > expectedPost ? '#155724' : actualWins < expectedPost ? '#721c24' : '#495057';
+                })(),
+                padding: '1px 2px',
+                borderRadius: '2px',
+                fontFamily: '"Courier New", Courier, monospace',
+                fontSize: '9px',
+                fontWeight: 'bold',
+                minWidth: '20px',
+                textAlign: 'center',
+                lineHeight: '1',
+                cursor: 'help',
+                border: '1px solid rgba(0,0,0,0.1)'
+              }}>
+                {seasonTotals.expectedWinsPost}
+              </div>
+            </Tooltip>
           </div>
         </td>
         <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '9px', padding: '4px'}}>
@@ -994,17 +1097,6 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
     </tbody>
   </table>
 </div>
-      
-      {/* Legend */}
-      <div style={{
-        marginTop: '12px',
-        fontSize: '11px',
-        color: '#6c757d',
-        textAlign: 'center',
-        fontFamily: '"Trebuchet MS", Arial, sans-serif'
-      }}>
-        <strong>Legend:</strong> Win Probability (Green = High, Red = Low) | PPA (Green = Better Performance, Red = Worse Performance) | Expected Wins colored green if over-performing, red if under-performing
-      </div>
     </div>
   );
 };
@@ -1311,6 +1403,8 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats,
         </div>
       );
     };
+
+    
 
     const StatCell = ({ value, statLabel, statKey, isOffense, higherBetter }) => {
       const rankings = calculateRankings(statKey, isOffense, higherBetter);

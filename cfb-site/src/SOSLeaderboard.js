@@ -581,9 +581,6 @@ useEffect(() => {
       <span className="sort-arrow-desktop">{getSortArrow('team')}</span>
     </th>
     
-    // 🔧 FIX 1: Correct Team Page URLs
-// Find the Link component in your team row and replace it with this:
-
 <Link 
   to={`/team/${encodeURIComponent(team.team)}?season=${selectedSeason}`}
   style={{ 
@@ -598,9 +595,6 @@ useEffect(() => {
     {team.abbreviation || team.team}
   </span>
 </Link>
-
-// 🔧 FIX 2: Narrow SOS Column on Mobile
-// Update the SOS header column to be responsive:
 
           <th 
             style={{ 

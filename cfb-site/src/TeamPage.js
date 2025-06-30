@@ -138,8 +138,39 @@
 
   // Replace your existing CompletedGamesTable component with this enhanced version:
 
-const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats }) => {
+// ADD THIS FUNCTION at the top of your EnhancedCompletedGamesTable component
+// (right after the component starts, before your other helper functions):
+
+const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats, allTeamsAdvancedStats }) => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  // ✅ ADD THIS NEW FUNCTION HERE:
+  const getPPARanking = (ppaValue, statKey, allTeamsStats, isDefense = false) => {
+    if (!ppaValue || ppaValue === 'N/A' || !allTeamsStats) return null;
+    
+    const validTeams = allTeamsStats
+      .filter(team => team[statKey] !== null && team[statKey] !== undefined)
+      .map(team => ({
+        team_name: team.team_name || team.team || team.school,
+        value: parseFloat(team[statKey])
+      }))
+      .filter(team => !isNaN(team.value));
+    
+    if (validTeams.length === 0) return null;
+    
+    // Sort: higher is better for offense, lower is better for defense
+    validTeams.sort((a, b) => isDefense ? a.value - b.value : b.value - a.value);
+    
+    const teamIndex = validTeams.findIndex(team => 
+      Math.abs(team.value - parseFloat(ppaValue)) < 0.001
+    );
+    
+    return {
+      rank: teamIndex >= 0 ? teamIndex + 1 : null,
+      total: validTeams.length
+    };
+  };
+
 
   // Helper function to get opponent rank
   const getOpponentRank = (opponentName) => {
@@ -281,6 +312,7 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats 
         fontSize: '13px',
         display: windowWidth >= 768 ? 'table' : 'none'
       }}>
+        
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
             <th style={headerStyle}>WK</th>
@@ -305,6 +337,8 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats 
           </tr>
         </thead>
         <tbody>
+          
+          
           {/* Game Rows */}
           {games
             .filter((game, index, self) => 
@@ -531,58 +565,189 @@ const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats 
               {seasonTotals.record}
             </td>
             <td style={{...cellStyle, backgroundColor: '#e9ecef', padding: '4px'}}>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px' }}>
-                <div style={{
-                  backgroundColor: parseFloat(seasonTotals.expectedWinsPre) > seasonTotals.actualWins ? '#28a745' : '#dc3545',
-                  color: '#ffffff',
-                  padding: '4px 6px',
-                  borderRadius: '3px',
-                  fontFamily: '"Courier New", Courier, monospace',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  minWidth: '35px',
-                  textAlign: 'center'
-                }}>
-                  {seasonTotals.expectedWinsPre}
+              // ... win probability stuff
+            </td>
+            
+            // 🎯 FIND THESE TWO PPA CELLS:
+            <td style={{
+              ...cellStyle,
+              backgroundColor: '#e9ecef',
+              fontFamily: '"Courier New", Courier, monospace',
+              fontWeight: 'bold',
+              color: '#495057',
+              fontSize: '15px'
+            }}>
+              <td style={{
+              ...cellStyle,
+              backgroundColor: '#e9ecef',
+              fontFamily: '"Courier New", Courier, monospace',
+              fontWeight: 'bold',
+              color: '#495057',
+              fontSize: '13px',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{ fontSize: '15px', lineHeight: '1' }}>
+                  {seasonTotals.seasonOffensePPA}
                 </div>
-                <div style={{
-                  backgroundColor: parseFloat(seasonTotals.expectedWinsPost) > seasonTotals.actualWins ? '#28a745' : '#dc3545',
-                  color: '#ffffff',
-                  padding: '4px 6px',
-                  borderRadius: '3px',
-                  fontFamily: '"Courier New", Courier, monospace',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  minWidth: '35px',
-                  textAlign: 'center'
-                }}>
-                  {seasonTotals.expectedWinsPost}
-                </div>
+                {(() => {
+                  const ranking = getPPARanking(
+                    seasonTotals.seasonOffensePPA, 
+                    'offense_ppa', 
+                    allTeamsAdvancedStats, 
+                    false
+                  );
+                  return ranking ? (
+                    <div style={{
+                      fontSize: '10px',
+                      fontWeight: 'normal',
+                      opacity: 0.8,
+                      marginTop: '2px',
+                      lineHeight: '1'
+                    }}>
+                      #{ranking.rank}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </td>
-            <td style={{
-              ...cellStyle,
-              backgroundColor: '#e9ecef',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontWeight: 'bold',
-              color: '#495057',
-              fontSize: '15px'
-            }}>
-              {seasonTotals.seasonOffensePPA}
-            </td>
-            <td style={{
-              ...cellStyle,
-              backgroundColor: '#e9ecef',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontWeight: 'bold',
-              color: '#495057',
-              fontSize: '15px'
-            }}>
               {seasonTotals.seasonDefensePPA}
             </td>
           </tr>
         </tbody>
       </table>
+
+      {/* Mobile Table */}
+      <div style={{ 
+        display: windowWidth < 768 ? 'block' : 'none'
+      }}>
+        <table style={{ 
+          width: '100%', 
+          borderCollapse: 'collapse', 
+          border: '1px solid #dee2e6',
+          fontSize: '11px'
+        }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f8f9fa' }}>
+              <th style={{...headerStyle, fontSize: '10px', width: '30px'}}>WK</th>
+              <th style={{...headerStyle, fontSize: '10px', width: '50px'}}>OPP</th>
+              <th style={{...headerStyle, fontSize: '10px', width: '50px'}}>SCORE</th>
+              <th style={{...headerStyle, fontSize: '10px', width: '70px'}}>WIN %</th>
+              <th style={{...headerStyle, fontSize: '10px', width: '45px'}}>OFF</th>
+              <th style={{...headerStyle, fontSize: '10px', width: '45px'}}>DEF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Same game rows as desktop but mobile-optimized */}
+            {games
+              .filter((game, index, self) => 
+                index === self.findIndex(g => g.id === game.id)
+              )
+              .filter(game => game.completed === true)
+              .sort((a, b) => {
+                if (a.season_type === 'postseason' && b.season_type !== 'postseason') return 1;
+                if (a.season_type !== 'postseason' && b.season_type === 'postseason') return -1;
+                if (a.week !== b.week) return a.week - b.week;
+                return new Date(a.start_date) - new Date(b.start_date);
+              })
+              .map((game, index) => {
+                // Same game logic as desktop
+                const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
+                const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
+                const isWin = teamScore > opponentScore;
+                const isAwayGame = game.home_away === 'away';
+                
+                return (
+                  <tr key={game.id} style={{ backgroundColor: index % 2 === 1 ? '#f8f9fa' : '#ffffff' }}>
+                    {/* Mobile-optimized cells */}
+                    <td style={{...cellStyle, padding: '4px', fontSize: '10px'}}>
+                      <span style={{ fontFamily: '"Courier New", Courier, monospace', fontWeight: 'bold' }}>
+                        {game.season_type === 'postseason' ? 'BG' : game.week}
+                      </span>
+                    </td>
+                    
+                    <td style={{...cellStyle, padding: '4px'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          {isAwayGame ? (
+                            <span style={{ color: '#6c757d', fontSize: '10px' }}>@</span>
+                          ) : (
+                            <span style={{ color: '#6c757d', fontSize: '10px' }}>vs</span>
+                          )}
+                          <img 
+                            src={game.opponent_logo || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                            alt={`${game.opponent} logo`}
+                            style={{ 
+                              width: '20px', 
+                              height: '20px', 
+                              cursor: 'pointer',
+                              borderRadius: '2px'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    
+                    <td style={{...cellStyle, fontFamily: '"Courier New", Courier, monospace', fontSize: '12px', fontWeight: 'bold'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <span style={{ color: '#000' }}>
+                          {isWin ? `${teamScore}-${opponentScore}` : `${opponentScore}-${teamScore}`}
+                        </span>
+                        <span style={{
+                          color: isWin ? '#28a745' : '#dc3545',
+                          fontWeight: 'bold',
+                          fontSize: '14px'
+                        }}>
+                          {isWin ? 'W' : 'L'}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    {/* Mobile win probability, offense PPA, defense PPA columns */}
+                    <td style={{...cellStyle, padding: '2px', fontSize: '10px'}}>N/A</td>
+                    <td style={{...cellStyle, padding: '2px', fontSize: '10px'}}>
+                      {game.offense_ppa ? parseFloat(game.offense_ppa).toFixed(2) : 'N/A'}
+                    </td>
+                    <td style={{...cellStyle, padding: '2px', fontSize: '10px'}}>
+                      {game.defense_ppa ? parseFloat(game.defense_ppa).toFixed(2) : 'N/A'}
+                    </td>
+                  </tr>
+                );
+              })}
+
+            {/* Mobile Season Totals Row */}
+            <tr style={{ 
+              backgroundColor: '#e9ecef', 
+              borderTop: '3px solid #495057',
+              fontWeight: 'bold'
+            }}>
+              <td style={{...cellStyle, backgroundColor: '#495057', color: '#ffffff', fontSize: '10px'}}>
+                SEASON
+              </td>
+              <td style={{...cellStyle, backgroundColor: '#495057', color: '#ffffff', fontSize: '10px'}}>
+                TOTAL
+              </td>
+              <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '12px', fontWeight: 'bold'}}>
+                {seasonTotals.record}
+              </td>
+              <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '10px'}}>
+                {seasonTotals.expectedWinsPre}
+              </td>
+              <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '10px'}}>
+                {seasonTotals.seasonOffensePPA}
+              </td>
+              <td style={{...cellStyle, backgroundColor: '#e9ecef', fontSize: '10px'}}>
+                {seasonTotals.seasonDefensePPA}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       
       {/* Legend */}
       <div style={{
@@ -1282,7 +1447,9 @@ const VerticalSeasonSummary = ({ teamData, games, allTeamsRankings }) => {
         border: '1px solid #dee2e6',
         borderRadius: '8px',
         overflow: 'hidden',
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        maxWidth: '400px', // ✅ CONDENSED WIDTH
+        width: '100%'      // ✅ FULL WIDTH ON MOBILE
       }}>
         <StatRow 
           label="Overall Record" 
@@ -1932,6 +2099,7 @@ function TeamPage() {
             teamName={teamName} 
             allTeamsRankings={allTeamsRankings}
             stats={stats}
+            allTeamsAdvancedStats={allTeamsAdvancedStats}  // ✅ ADD THIS
 />
         </div>
 

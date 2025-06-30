@@ -136,182 +136,218 @@
     lineHeight: '1.2'
   };
 
-  // Completed Games Table Component
-  const CompletedGamesTable = ({ games, teamName, allTeamsRankings }) => {
-    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  // Replace your existing CompletedGamesTable component with this enhanced version:
 
-// ADD THE HELPER FUNCTION HERE:
+const EnhancedCompletedGamesTable = ({ games, teamName, allTeamsRankings, stats }) => {
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  // Helper function to get opponent rank
   const getOpponentRank = (opponentName) => {
-  if (!allTeamsRankings || !opponentName || !Array.isArray(allTeamsRankings)) {
-    console.log('❌ getOpponentRank early return:', { 
-      hasRankings: !!allTeamsRankings, 
-      hasName: !!opponentName, 
-      isArray: Array.isArray(allTeamsRankings) 
-    });
-    return null;
-  }
-  
-  console.log('🔍 Looking for opponent:', opponentName, 'in', allTeamsRankings.length, 'teams');
-  
-  const opponent = allTeamsRankings.find(team => 
-    team.team_name === opponentName || 
-    team.school === opponentName ||
-    team.team === opponentName
-  );
-  
-  console.log('🎯 Found opponent:', opponent ? `${opponent.team_name} (rank ${opponent.power_rank})` : 'NOT FOUND');
-  
-  return opponent ? opponent.power_rank : null;
-};
+    if (!allTeamsRankings || !opponentName || !Array.isArray(allTeamsRankings)) {
+      return null;
+    }
+    
+    const opponent = allTeamsRankings.find(team => 
+      team.team_name === opponentName || 
+      team.school === opponentName ||
+      team.team === opponentName
+    );
+    
+    return opponent ? opponent.power_rank : null;
+  };
 
-// ADD THE getRankColor FUNCTION HERE:
+  // Helper function to get rank colors
   const getRankColor = (rank) => {
-  if (!rank || rank < 1) return { bg: '#6c757d', text: '#fff' };
-  
-  // Convert rank to percentile (1 = 100th percentile, 134 = 1st percentile)
-  const percentile = ((134 - rank + 1) / 134) * 100;
-  
-  // Return both background and text colors
-  if (percentile >= 96) return { bg: '#58c36c', text: '#fff' };      // Dark green - white text
-  if (percentile >= 91) return { bg: '#6aca7c', text: '#fff' };      // Green - white text  
-  if (percentile >= 86) return { bg: '#7cd08b', text: '#fff' };      // Light green - white text
-  if (percentile >= 81) return { bg: '#8dd69b', text: '#000' };      // Lighter green - black text
-  if (percentile >= 76) return { bg: '#9fddaa', text: '#000' };      // Light green - black text
-  if (percentile >= 71) return { bg: '#b0e3ba', text: '#000' };      // Very light green - black text
-  if (percentile >= 66) return { bg: '#c2e9c9', text: '#000' };      // Pale green - black text
-  if (percentile >= 61) return { bg: '#d4f0d9', text: '#000' };      // Very pale green - black text
-  if (percentile >= 56) return { bg: '#e5f6e8', text: '#000' };      // Almost white green - black text
-  if (percentile >= 51) return { bg: '#f7fcf8', text: '#000' };      // White green - black text
-  if (percentile >= 46) return { bg: '#fdf5f4', text: '#000' };      // White pink - black text
-  if (percentile >= 41) return { bg: '#fbe1df', text: '#000' };      // Very pale red - black text
-  if (percentile >= 36) return { bg: '#f9cdc9', text: '#000' };      // Pale red - black text
-  if (percentile >= 31) return { bg: '#f7b9b4', text: '#000' };      // Light red - black text
-  if (percentile >= 26) return { bg: '#f5a59f', text: '#000' };      // Light red - black text
-  if (percentile >= 21) return { bg: '#f2928a', text: '#fff' };      // Medium red - white text
-  if (percentile >= 16) return { bg: '#f07e74', text: '#fff' };      // Red - white text
-  if (percentile >= 11) return { bg: '#ee6a5f', text: '#fff' };      // Dark red - white text
-  if (percentile >= 6) return { bg: '#ec564a', text: '#fff' };       // Darker red - white text
-  return { bg: '#ea4335', text: '#fff' };                           // Darkest red - white text
-};
+    if (!rank || rank < 1) return { bg: '#6c757d', text: '#fff' };
+    
+    const percentile = ((134 - rank + 1) / 134) * 100;
+    
+    if (percentile >= 96) return { bg: '#58c36c', text: '#fff' };
+    if (percentile >= 91) return { bg: '#6aca7c', text: '#fff' };
+    if (percentile >= 86) return { bg: '#7cd08b', text: '#fff' };
+    if (percentile >= 81) return { bg: '#8dd69b', text: '#000' };
+    if (percentile >= 76) return { bg: '#9fddaa', text: '#000' };
+    if (percentile >= 71) return { bg: '#b0e3ba', text: '#000' };
+    if (percentile >= 66) return { bg: '#c2e9c9', text: '#000' };
+    if (percentile >= 61) return { bg: '#d4f0d9', text: '#000' };
+    if (percentile >= 56) return { bg: '#e5f6e8', text: '#000' };
+    if (percentile >= 51) return { bg: '#f7fcf8', text: '#000' };
+    if (percentile >= 46) return { bg: '#fdf5f4', text: '#000' };
+    if (percentile >= 41) return { bg: '#fbe1df', text: '#000' };
+    if (percentile >= 36) return { bg: '#f9cdc9', text: '#000' };
+    if (percentile >= 31) return { bg: '#f7b9b4', text: '#000' };
+    if (percentile >= 26) return { bg: '#f5a59f', text: '#000' };
+    if (percentile >= 21) return { bg: '#f2928a', text: '#fff' };
+    if (percentile >= 16) return { bg: '#f07e74', text: '#fff' };
+    if (percentile >= 11) return { bg: '#ee6a5f', text: '#fff' };
+    if (percentile >= 6) return { bg: '#ec564a', text: '#fff' };
+    return { bg: '#ea4335', text: '#fff' };
+  };
+
+  // Calculate expected wins and season totals
+  const calculateSeasonTotals = (games, stats) => {
+    let actualWins = 0;
+    let expectedWinsPre = 0;
+    let expectedWinsPost = 0;
+    let totalGames = 0;
+
+    games.forEach(game => {
+      if (game.completed) {
+        totalGames++;
+        
+        // Count actual wins
+        const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
+        const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
+        if (teamScore > opponentScore) {
+          actualWins++;
+        }
+
+        // Calculate pregame expected wins
+        let pregameProb = null;
+        if (game.home_moneyline && game.away_moneyline) {
+          const homeRawProb = moneylineToProbability(game.home_moneyline);
+          const awayRawProb = moneylineToProbability(game.away_moneyline);
+          
+          if (homeRawProb && awayRawProb) {
+            const totalProb = homeRawProb + awayRawProb;
+            const homeAdjustedProb = homeRawProb / totalProb;
+            const awayAdjustedProb = awayRawProb / totalProb;
+            pregameProb = game.home_away === 'home' ? homeAdjustedProb : awayAdjustedProb;
+          }
+        } else if (game.spread) {
+          const spreadValue = parseFloat(game.spread);
+          const adjustedSpread = game.home_away === 'home' ? spreadValue : -spreadValue;
+          pregameProb = spreadToProbability(adjustedSpread);
+        }
+        
+        if (pregameProb) {
+          expectedWinsPre += pregameProb;
+        }
+
+        // Calculate postgame expected wins
+        const postgameProb = game.home_away === 'home' 
+          ? parseFloat(game.home_postgame_win_probability)
+          : parseFloat(game.away_postgame_win_probability);
+        
+        if (postgameProb) {
+          expectedWinsPost += postgameProb;
+        }
+      }
+    });
+
+    return {
+      actualWins,
+      expectedWinsPre: expectedWinsPre.toFixed(1),
+      expectedWinsPost: expectedWinsPost.toFixed(1),
+      totalGames,
+      record: `${actualWins}-${totalGames - actualWins}`,
+      seasonOffensePPA: stats?.offense_ppa?.toFixed(3) || 'N/A',
+      seasonDefensePPA: stats?.defense_ppa?.toFixed(3) || 'N/A'
+    };
+  };
+
+  const seasonTotals = calculateSeasonTotals(games, stats);
 
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
     };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    if (!games || games.length === 0) {
-      return (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '40px', 
-          color: '#6c757d',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px',
-          marginTop: '20px'
-        }}>
-          No completed games available
-        </div>
-      );
-    }
-
+  if (!games || games.length === 0) {
     return (
-      <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-        {/* Desktop Table */}
-        <table style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse', 
-          border: '1px solid #dee2e6',
-          fontSize: '13px',
-          display: windowWidth >= 768 ? 'table' : 'none'
-        }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th style={headerStyle}>WK</th>
-              <th style={headerStyle}>OPPONENT</th>
-              <th style={headerStyle}>SCORE</th>
-              <th style={headerStyle}>WIN PROBABILITY</th>
-              <th style={headerStyle}>OFF PPA</th>
-              <th style={headerStyle}>DEF PPA</th>
-            </tr>
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-              <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-              <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-              <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}>
-                <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                  <span>Pre</span>
-                  <span>Post</span>
-                </div>
-              </th>
-              <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-              <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {games
-  .filter((game, index, self) => 
-    index === self.findIndex(g => g.id === game.id)
-  )
-  .filter(game => 
-    game.completed === true
-  )
-  .sort((a, b) => {
-      // Regular season games first, then postseason
-      if (a.season_type === 'postseason' && b.season_type !== 'postseason') return 1;
-      if (a.season_type !== 'postseason' && b.season_type === 'postseason') return -1;
-      
-      // Within same season type, sort by week first, then by start_date
-      if (a.week !== b.week) {
-        return a.week - b.week;
-      }
-      
-      // If same week (like postseason week 1), sort by start_date
-      return new Date(a.start_date) - new Date(b.start_date);
-    })
-    .map((game, index) => {
-              const isWin = (game.home_away === 'home' && game.home_points > game.away_points) ||
-                          (game.home_away === 'away' && game.away_points > game.home_points);
-              
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '40px', 
+        color: '#6c757d',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px',
+        marginTop: '20px'
+      }}>
+        No completed games available
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+      {/* Desktop Table */}
+      <table style={{ 
+        width: '100%', 
+        borderCollapse: 'collapse', 
+        border: '1px solid #dee2e6',
+        fontSize: '13px',
+        display: windowWidth >= 768 ? 'table' : 'none'
+      }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f8f9fa' }}>
+            <th style={headerStyle}>WK</th>
+            <th style={headerStyle}>OPPONENT</th>
+            <th style={headerStyle}>SCORE</th>
+            <th style={headerStyle}>WIN PROBABILITY</th>
+            <th style={headerStyle}>OFF PPA</th>
+            <th style={headerStyle}>DEF PPA</th>
+          </tr>
+          <tr style={{ backgroundColor: '#f8f9fa' }}>
+            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
+            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
+            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
+            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}>
+              <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                <span>Pre</span>
+                <span>Post</span>
+              </div>
+            </th>
+            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
+            <th style={{...headerStyle, fontSize: '10px', color: '#6c757d'}}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {/* Game Rows */}
+          {games
+            .filter((game, index, self) => 
+              index === self.findIndex(g => g.id === game.id)
+            )
+            .filter(game => game.completed === true)
+            .sort((a, b) => {
+              if (a.season_type === 'postseason' && b.season_type !== 'postseason') return 1;
+              if (a.season_type !== 'postseason' && b.season_type === 'postseason') return -1;
+              if (a.week !== b.week) return a.week - b.week;
+              return new Date(a.start_date) - new Date(b.start_date);
+            })
+            .map((game, index) => {
               const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
               const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
+              const isWin = teamScore > opponentScore;
               
-            let pregameProb = null;
-  let debugInfo = `${game.home_moneyline || 'null'},${game.away_moneyline || 'null'}`;
-
-  if (game.home_moneyline && game.away_moneyline) {
-    // Use moneylines with juice removal
-    const homeRawProb = moneylineToProbability(game.home_moneyline);
-    const awayRawProb = moneylineToProbability(game.away_moneyline);
-    
-    if (homeRawProb && awayRawProb) {
-      const totalProb = homeRawProb + awayRawProb;
-      const homeAdjustedProb = homeRawProb / totalProb;
-      const awayAdjustedProb = awayRawProb / totalProb;
-      pregameProb = game.home_away === 'home' ? homeAdjustedProb : awayAdjustedProb;
-      debugInfo = `${Math.round(pregameProb * 100)}%`;
-    } else {
-      debugInfo = 'CALC_FAIL';
-    }
-  } else if (game.spread) {
-    // Fallback to spread calculation - convert to number
-    const spreadValue = parseFloat(game.spread);
-    const adjustedSpread = game.home_away === 'home' ? spreadValue : -spreadValue;
-    pregameProb = spreadToProbability(adjustedSpread);
-    debugInfo = pregameProb ? `${Math.round(pregameProb * 100)}%` : 'SPREAD_FAIL';
-  } else {
-    debugInfo = 'N/A';
-  }
+              // Calculate pregame probability
+              let pregameProb = null;
+              let debugInfo = 'N/A';
               
-              // Get postgame win probability
+              if (game.home_moneyline && game.away_moneyline) {
+                const homeRawProb = moneylineToProbability(game.home_moneyline);
+                const awayRawProb = moneylineToProbability(game.away_moneyline);
+                
+                if (homeRawProb && awayRawProb) {
+                  const totalProb = homeRawProb + awayRawProb;
+                  const homeAdjustedProb = homeRawProb / totalProb;
+                  const awayAdjustedProb = awayRawProb / totalProb;
+                  pregameProb = game.home_away === 'home' ? homeAdjustedProb : awayAdjustedProb;
+                  debugInfo = `${Math.round(pregameProb * 100)}%`;
+                }
+              } else if (game.spread) {
+                const spreadValue = parseFloat(game.spread);
+                const adjustedSpread = game.home_away === 'home' ? spreadValue : -spreadValue;
+                pregameProb = spreadToProbability(adjustedSpread);
+                debugInfo = pregameProb ? `${Math.round(pregameProb * 100)}%` : 'N/A';
+              }
+              
               const postgameProb = game.home_away === 'home' 
                 ? parseFloat(game.home_postgame_win_probability)
                 : parseFloat(game.away_postgame_win_probability);
               
-              // Determine if home or neutral game (for vs. prefix)
               const isAwayGame = game.home_away === 'away';
               
               return (
@@ -319,131 +355,119 @@
                   {/* Week */}
                   <td style={cellStyle}>
                     <span style={{ fontFamily: '"Courier New", Courier, monospace', fontWeight: 'bold' }}>
-    {game.season_type === 'postseason' ? 'BG' : game.week}
-  </span>
+                      {game.season_type === 'postseason' ? 'BG' : game.week}
+                    </span>
                   </td>
                   
-                  {/* Opponent with logo and @ or vs. symbol */}
+                  {/* Opponent */}
                   <td style={cellStyle}>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-    {isAwayGame ? (
-      <span style={{ color: '#6c757d', fontWeight: 'bold' }}>@</span>
-    ) : (
-      <span style={{ color: '#6c757d', fontWeight: 'bold' }}>vs.</span>
-    )}
-    <img 
-      src={game.opponent_logo || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-      alt={`${game.opponent} logo`}
-      style={{ 
-        width: '24px', 
-        height: '24px', 
-        cursor: 'pointer',
-        borderRadius: '2px'
-      }}
-      onClick={() => window.location.href = `/team/${encodeURIComponent(game.opponent)}`}
-      title={`Go to ${game.opponent} team page`}
-    />
-    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-      <span style={{ 
-        fontWeight: 'bold', 
-        textTransform: 'uppercase',
-        fontSize: '12px',
-        fontFamily: '"Trebuchet MS", Arial, sans-serif'
-      }}>
-        {game.opponent}
-      </span>
-      {(() => {
-  const rank = getOpponentRank(game.opponent);
-  if (!rank) return null;
-  const colors = getRankColor(rank);
-  return (
-    <span style={{
-      fontSize: '10px',
-      color: colors.text,
-      fontFamily: '"Trebuchet MS", Arial, sans-serif',
-      fontWeight: 'bold',
-      backgroundColor: colors.bg,
-      padding: '2px 6px',
-      borderRadius: '4px',
-      marginLeft: '4px',
-      border: '1px solid rgba(0,0,0,0.1)',
-      minWidth: '20px',
-      textAlign: 'center',
-      display: 'inline-block'
-    }}>
-      #{rank}
-    </span>
-  );
-})()}
-    </div>
-  </div>
-</td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isAwayGame ? (
+                        <span style={{ color: '#6c757d', fontWeight: 'bold' }}>@</span>
+                      ) : (
+                        <span style={{ color: '#6c757d', fontWeight: 'bold' }}>vs.</span>
+                      )}
+                      <img 
+                        src={game.opponent_logo || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                        alt={`${game.opponent} logo`}
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          cursor: 'pointer',
+                          borderRadius: '2px'
+                        }}
+                        onClick={() => window.location.href = `/team/${encodeURIComponent(game.opponent)}`}
+                        title={`Go to ${game.opponent} team page`}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ 
+                          fontWeight: 'bold', 
+                          textTransform: 'uppercase',
+                          fontSize: '12px',
+                          fontFamily: '"Trebuchet MS", Arial, sans-serif'
+                        }}>
+                          {game.opponent}
+                        </span>
+                        {(() => {
+                          const rank = getOpponentRank(game.opponent);
+                          if (!rank) return null;
+                          const colors = getRankColor(rank);
+                          return (
+                            <span style={{
+                              fontSize: '10px',
+                              color: colors.text,
+                              fontFamily: '"Trebuchet MS", Arial, sans-serif',
+                              fontWeight: 'bold',
+                              backgroundColor: colors.bg,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              marginLeft: '4px',
+                              border: '1px solid rgba(0,0,0,0.1)',
+                              minWidth: '20px',
+                              textAlign: 'center',
+                              display: 'inline-block'
+                            }}>
+                              #{rank}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </td>
                   
-                  {/* Score with win/loss colored box */}
-<td style={{
-  ...cellStyle,
-  fontWeight: 'bold',
-  fontFamily: '"Courier New", Courier, monospace',
-  fontSize: '14px',
-  padding: '4px'
-}}>
-  <span style={{
-    backgroundColor: isWin ? '#6aca7c' : '#ee6a5f',
-    color: '#ffffff',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    fontWeight: 'bold',
-    border: '1px solid rgba(0,0,0,0.1)'
-  }}>
-    {teamScore}-{opponentScore}
-  </span>
-</td>
+                  {/* Score - Winner first, W/L indicator */}
+                  <td style={{...cellStyle, fontFamily: '"Courier New", Courier, monospace', fontSize: '14px', fontWeight: 'bold'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <span style={{ color: '#000' }}>
+                        {isWin ? `${teamScore}-${opponentScore}` : `${opponentScore}-${teamScore}`}
+                      </span>
+                      <span style={{
+                        color: isWin ? '#28a745' : '#dc3545',
+                        fontWeight: 'bold',
+                        fontSize: '16px'
+                      }}>
+                        {isWin ? 'W' : 'L'}
+                      </span>
+                    </div>
+                  </td>
                   
-                  {/* Win Probability - Pre and Post side by side */}
-  <td style={{...cellStyle, width: '100px', padding: '4px'}}>
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center',
-      gap: '0px'
-    }}>
-      {/* Pregame Win Probability */}
-  <div style={{
-    backgroundColor: pregameProb ? getProbabilityColor(pregameProb) : '#f8f9fa',
-    color: '#000000',
-    padding: '2px 4px',
-    borderRadius: '0px',
-    fontFamily: '"Courier New", Courier, monospace',
-    fontSize: '13px',
-    fontWeight: '900',
-    letterSpacing: '0.5px',
-    minWidth: '28px',
-    textAlign: 'center',
-    border: 'none',
-    lineHeight: '1'
-  }}>
-    {debugInfo}
-  </div>
-
-  {/* Postgame Win Probability */}
-  <div style={{
-    backgroundColor: postgameProb ? getProbabilityColor(postgameProb) : '#f8f9fa',
-    color: '#000000',
-    padding: '2px 4px',
-    borderRadius: '0px',
-    fontFamily: '"Courier New", Courier, monospace',
-    fontSize: '13px',
-    fontWeight: '900',
-    letterSpacing: '0.5px',
-    minWidth: '32px',
-    textAlign: 'center',
-    border: 'none',
-    lineHeight: '1'
-  }}>
-    {postgameProb ? `${Math.round(postgameProb * 100)}%` : 'N/A'}
-  </div>
-    </div>
-  </td>
+                  {/* Win Probability */}
+                  <td style={{...cellStyle, width: '100px', padding: '4px'}}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px' }}>
+                      <div style={{
+                        backgroundColor: pregameProb ? getProbabilityColor(pregameProb) : '#f8f9fa',
+                        color: '#000000',
+                        padding: '2px 4px',
+                        borderRadius: '0px',
+                        fontFamily: '"Courier New", Courier, monospace',
+                        fontSize: '13px',
+                        fontWeight: '900',
+                        letterSpacing: '0.5px',
+                        minWidth: '28px',
+                        textAlign: 'center',
+                        border: 'none',
+                        lineHeight: '1'
+                      }}>
+                        {debugInfo}
+                      </div>
+                      <div style={{
+                        backgroundColor: postgameProb ? getProbabilityColor(postgameProb) : '#f8f9fa',
+                        color: '#000000',
+                        padding: '2px 4px',
+                        borderRadius: '0px',
+                        fontFamily: '"Courier New", Courier, monospace',
+                        fontSize: '13px',
+                        fontWeight: '900',
+                        letterSpacing: '0.5px',
+                        minWidth: '32px',
+                        textAlign: 'center',
+                        border: 'none',
+                        lineHeight: '1'
+                      }}>
+                        {postgameProb ? `${Math.round(postgameProb * 100)}%` : 'N/A'}
+                      </div>
+                    </div>
+                  </td>
                   
                   {/* Offensive PPA */}
                   <td style={{
@@ -471,246 +495,108 @@
                 </tr>
               );
             })}
-          </tbody>
-        </table>
 
-        {/* Mobile Table - Logo Only */}
-  <div style={{ 
-    display: windowWidth < 768 ? 'block' : 'none'
-  }}>
-    <table style={{ 
-      width: '100%', 
-      borderCollapse: 'collapse', 
-      border: '1px solid #dee2e6',
-      fontSize: '11px'
-    }}>
-      <thead>
-        <tr style={{ backgroundColor: '#f8f9fa' }}>
-          <th style={{...headerStyle, fontSize: '10px', width: '30px'}}>WK</th>
-          <th style={{...headerStyle, fontSize: '10px', width: '50px'}}>OPP</th>
-          <th style={{...headerStyle, fontSize: '10px', width: '50px'}}>SCORE</th>
-          <th style={{...headerStyle, fontSize: '10px', width: '70px'}}>WIN %</th>
-          <th style={{...headerStyle, fontSize: '10px', width: '45px'}}>OFF</th>
-          <th style={{...headerStyle, fontSize: '10px', width: '45px'}}>DEF</th>
-        </tr>
-      </thead>
-      <tbody>
-        {games
-  .filter((game, index, self) => 
-    index === self.findIndex(g => g.id === game.id)
-  )
-  .filter(game => 
-    game.completed === true
-  )
-  .sort((a, b) => {
-      // Regular season games first, then postseason
-      if (a.season_type === 'postseason' && b.season_type !== 'postseason') return 1;
-      if (a.season_type !== 'postseason' && b.season_type === 'postseason') return -1;
-      return a.week - b.week;
-    })
-    .map((game, index) => {
-          const isWin = (game.home_away === 'home' && game.home_points > game.away_points) ||
-                      (game.home_away === 'away' && game.away_points > game.home_points);
-          
-          const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
-          const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
-          
-       // Calculate pregame win probability with spread fallback
-let pregameProb = null;
-let displayText = 'N/A';
-
-if (game.home_moneyline && game.away_moneyline) {
-  // Use moneylines with juice removal
-  const homeRawProb = moneylineToProbability(game.home_moneyline);
-  const awayRawProb = moneylineToProbability(game.away_moneyline);
-  
-  if (homeRawProb && awayRawProb) {
-    const totalProb = homeRawProb + awayRawProb;
-    const homeAdjustedProb = homeRawProb / totalProb;
-    const awayAdjustedProb = awayRawProb / totalProb;
-    pregameProb = game.home_away === 'home' ? homeAdjustedProb : awayAdjustedProb;
-    displayText = `${Math.round(pregameProb * 100)}%`;
-  } else {
-    displayText = 'N/A';
-  }
-} else if (game.spread) {
-  // Fallback to spread calculation - convert to number
-  const spreadValue = parseFloat(game.spread);
-  const adjustedSpread = game.home_away === 'home' ? spreadValue : -spreadValue;
-  pregameProb = spreadToProbability(adjustedSpread);
-  displayText = pregameProb ? `${Math.round(pregameProb * 100)}%` : 'N/A';
-} else {
-  displayText = 'N/A';
-}
-          
-          const postgameProb = game.home_away === 'home' 
-            ? parseFloat(game.home_postgame_win_probability)
-            : parseFloat(game.away_postgame_win_probability);
-          
-          const isAwayGame = game.home_away === 'away';
-          
-          return (
-            <tr key={game.id} style={{ backgroundColor: index % 2 === 1 ? '#f8f9fa' : '#ffffff' }}>
-              {/* Week */}
-              <td style={{...cellStyle, padding: '4px', fontSize: '10px'}}>
-                <span style={{ fontFamily: '"Courier New", Courier, monospace', fontWeight: 'bold' }}>
-    {game.season_type === 'postseason' ? 'BG' : game.week}
-  </span>
-              </td>
-              
-              {/* Opponent Logo Only */}
-              <td style={{...cellStyle, padding: '4px'}}>
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', flexDirection: 'column' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-      {isAwayGame ? (
-        <span style={{ color: '#6c757d', fontSize: '10px' }}>@</span>
-      ) : (
-        <span style={{ color: '#6c757d', fontSize: '10px' }}>vs</span>
-      )}
-      <img 
-        src={game.opponent_logo || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-        alt={`${game.opponent} logo`}
-        style={{ 
-          width: '20px', 
-          height: '20px', 
-          cursor: 'pointer',
-          borderRadius: '2px'
-        }}
-        onClick={() => window.location.href = `/team/${encodeURIComponent(game.opponent)}`}
-        title={`Go to ${game.opponent} team page`}
-      />
-    </div>
-    {(() => {
-  const rank = getOpponentRank(game.opponent);
-  if (!rank) return null;
-  const colors = getRankColor(rank);
-  return (
-    <span style={{
-      fontSize: '8px',
-      color: colors.text,
-      fontFamily: '"Trebuchet MS", Arial, sans-serif',
-      fontWeight: 'bold',
-      backgroundColor: colors.bg,
-      padding: '1px 4px',
-      borderRadius: '3px',
-      border: '1px solid rgba(0,0,0,0.1)',
-      minWidth: '16px',
-      textAlign: 'center',
-      display: 'inline-block',
-      lineHeight: '1'
-    }}>
-      #{rank}
-    </span>
-  );
-})()}
-  </div>
-</td>
-              
-              {/* Score */}
-<td style={{
-  ...cellStyle,
-  fontFamily: '"Courier New", Courier, monospace',
-  fontSize: '14px',
-  fontWeight: '900',
-  padding: '4px'
-}}>
-  <span style={{
-    backgroundColor: isWin ? '#6aca7c' : '#ee6a5f',
-    color: '#ffffff',
-    padding: '3px 6px',
-    borderRadius: '3px',
-    fontWeight: 'bold',
-    border: '1px solid rgba(0,0,0,0.1)',
-    fontSize: '12px'
-  }}>
-    {teamScore}-{opponentScore}
-  </span>
-</td>
-              
-              {/* Win Probability */}
-  <td style={{...cellStyle, padding: '2px', borderLeft: '2px solid #dee2e6'}}>
-    <div style={{ display: 'flex', gap: '1px', justifyContent: 'center' }}>
-      <div style={{
-              backgroundColor: pregameProb ? getProbabilityColor(pregameProb) : '#f8f9fa',
-              color: '#000000',
-              padding: '5px 5px',
-              borderRadius: '2px',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontSize: '11px',
-              fontWeight: '900',
-              letterSpacing: '0.3px',
-              minWidth: '30px',
-              textAlign: 'center',
-              border: 'none',
-              lineHeight: '1'
+          {/* Season Totals Row */}
+          <tr style={{ 
+            backgroundColor: '#e9ecef', 
+            borderTop: '3px solid #495057',
+            fontWeight: 'bold'
+          }}>
+            <td style={{
+              ...cellStyle,
+              backgroundColor: '#495057',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              textAlign: 'center'
             }}>
-              {displayText}
-            </div>
+              SEASON
+            </td>
+            <td style={{
+              ...cellStyle,
+              backgroundColor: '#495057',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}>
+              TOTALS
+            </td>
+            <td style={{
+              ...cellStyle,
+              backgroundColor: '#e9ecef',
+              fontFamily: '"Courier New", Courier, monospace',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#495057'
+            }}>
+              {seasonTotals.record}
+            </td>
+            <td style={{...cellStyle, backgroundColor: '#e9ecef', padding: '4px'}}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px' }}>
+                <div style={{
+                  backgroundColor: parseFloat(seasonTotals.expectedWinsPre) > seasonTotals.actualWins ? '#28a745' : '#dc3545',
+                  color: '#ffffff',
+                  padding: '4px 6px',
+                  borderRadius: '3px',
+                  fontFamily: '"Courier New", Courier, monospace',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  minWidth: '35px',
+                  textAlign: 'center'
+                }}>
+                  {seasonTotals.expectedWinsPre}
+                </div>
+                <div style={{
+                  backgroundColor: parseFloat(seasonTotals.expectedWinsPost) > seasonTotals.actualWins ? '#28a745' : '#dc3545',
+                  color: '#ffffff',
+                  padding: '4px 6px',
+                  borderRadius: '3px',
+                  fontFamily: '"Courier New", Courier, monospace',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  minWidth: '35px',
+                  textAlign: 'center'
+                }}>
+                  {seasonTotals.expectedWinsPost}
+                </div>
+              </div>
+            </td>
+            <td style={{
+              ...cellStyle,
+              backgroundColor: '#e9ecef',
+              fontFamily: '"Courier New", Courier, monospace',
+              fontWeight: 'bold',
+              color: '#495057',
+              fontSize: '15px'
+            }}>
+              {seasonTotals.seasonOffensePPA}
+            </td>
+            <td style={{
+              ...cellStyle,
+              backgroundColor: '#e9ecef',
+              fontFamily: '"Courier New", Courier, monospace',
+              fontWeight: 'bold',
+              color: '#495057',
+              fontSize: '15px'
+            }}>
+              {seasonTotals.seasonDefensePPA}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      {/* Legend */}
       <div style={{
-        backgroundColor: postgameProb ? getProbabilityColor(postgameProb) : '#f8f9fa',
-        color: '#000000',
-        padding: '5px 5px',
-        borderRadius: '0px',
-        fontFamily: '"Courier New", Courier, monospace',
+        marginTop: '12px',
         fontSize: '11px',
-        fontWeight: '900',
-        letterSpacing: '0.3px',
-        minWidth: '30px',
+        color: '#6c757d',
         textAlign: 'center',
-        border: 'none',
-        lineHeight: '1'
+        fontFamily: '"Trebuchet MS", Arial, sans-serif'
       }}>
-        {postgameProb ? `${Math.round(postgameProb * 100)}%` : 'N/A'}
+        <strong>Legend:</strong> Win Probability (Green = High, Red = Low) | PPA (Green = Better Performance, Red = Worse Performance) | Expected Wins colored green if over-performing, red if under-performing
       </div>
     </div>
-  </td>
-
-  {/* Off PPA */}
-  <td style={{
-    ...cellStyle,
-    padding: '4px',
-    backgroundColor: getPPAColor(parseFloat(game.offense_ppa), false),
-    fontFamily: '"Courier New", Courier, monospace',
-    fontWeight: 'bold',
-    color: '#212529',
-    fontSize: '14px',
-    borderLeft: '2px solid #dee2e6'
-  }}>
-    {game.offense_ppa ? parseFloat(game.offense_ppa).toFixed(2) : 'N/A'}
-  </td>
-
-  {/* Def PPA */}
-  <td style={{
-    ...cellStyle,
-    padding: '4px',
-    backgroundColor: getPPAColor(parseFloat(game.defense_ppa), true),
-    fontFamily: '"Courier New", Courier, monospace',
-    fontWeight: 'bold',
-    color: '#212529',
-    fontSize: '14px'
-  }}>
-    {game.defense_ppa ? parseFloat(game.defense_ppa).toFixed(2) : 'N/A'}
-  </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  </div>
-        
-        {/* Legend */}
-        <div style={{
-          marginTop: '12px',
-          fontSize: '11px',
-          color: '#6c757d',
-          textAlign: 'center',
-          fontFamily: '"Trebuchet MS", Arial, sans-serif'
-        }}>
-          <strong>Color Legend:</strong> Win Probability (Green = High, Red = Low) | PPA (Green = Better Performance, Red = Worse Performance)
-        </div>
-      </div>
-    );
-  };
+  );
+};
 
   // Replace your AdvancedStatsTable component with this updated version:
 
@@ -1225,6 +1111,232 @@ if (game.home_moneyline && game.away_moneyline) {
       </div>
     );
   };
+
+  // Add this component after your AdvancedStatsTable component:
+
+const VerticalSeasonSummary = ({ teamData, games, allTeamsRankings }) => {
+  // Calculate overall record
+  const calculateRecord = (games, conferenceOnly = false) => {
+    if (!games || games.length === 0) return "0-0";
+    
+    let wins = 0;
+    let losses = 0;
+    
+    games.forEach(game => {
+      if (game.completed) {
+        // Filter for conference games if requested
+        if (conferenceOnly && !game.conference_game) return;
+        
+        const teamScore = game.home_away === 'home' ? game.home_points : game.away_points;
+        const opponentScore = game.home_away === 'home' ? game.away_points : game.home_points;
+        
+        if (teamScore > opponentScore) {
+          wins++;
+        } else {
+          losses++;
+        }
+      }
+    });
+    
+    return `${wins}-${losses}`;
+  };
+
+  // Calculate strength of schedule from games played
+  const calculateStrengthOfSchedule = (games, allTeamsRankings) => {
+    if (!games || !allTeamsRankings || games.length === 0) return null;
+    
+    let totalRating = 0;
+    let gamesCount = 0;
+    
+    games.forEach(game => {
+      if (game.completed && game.opponent) {
+        // Find opponent's power rating
+        const opponent = allTeamsRankings.find(team => 
+          team.team_name === game.opponent || 
+          team.school === game.opponent
+        );
+        
+        if (opponent && opponent.power_rating) {
+          totalRating += parseFloat(opponent.power_rating);
+          gamesCount++;
+        }
+      }
+    });
+    
+    return gamesCount > 0 ? totalRating / gamesCount : null;
+  };
+
+  // Calculate SOS ranking among all teams (simplified)
+  const calculateSOSRank = (strengthOfSchedule, allTeamsRankings) => {
+    if (!strengthOfSchedule || !allTeamsRankings) return null;
+    
+    // Simple ranking based on SOS value vs average
+    const avgSOS = 0; // You could calculate this more precisely
+    const totalTeams = allTeamsRankings.length;
+    
+    if (strengthOfSchedule > avgSOS) {
+      return Math.ceil(totalTeams * 0.3); // Top 30% for above average SOS
+    } else {
+      return Math.ceil(totalTeams * 0.7); // Bottom 70% for below average SOS
+    }
+  };
+
+  // Get percentile color for ratings
+  const getPercentileColor = (rank, total) => {
+    if (!rank || !total || rank === 'N/A') return '#f8f9fa';
+    
+    const percentile = ((total - rank + 1) / total) * 100;
+    
+    if (percentile >= 96) return '#58c36c';
+    if (percentile >= 91) return '#6aca7c';
+    if (percentile >= 86) return '#7cd08b';
+    if (percentile >= 81) return '#8dd69b';
+    if (percentile >= 76) return '#9fddaa';
+    if (percentile >= 71) return '#b0e3ba';
+    if (percentile >= 66) return '#c2e9c9';
+    if (percentile >= 61) return '#d4f0d9';
+    if (percentile >= 56) return '#e5f6e8';
+    if (percentile >= 51) return '#f7fcf8';
+    if (percentile >= 46) return '#fdf5f4';
+    if (percentile >= 41) return '#fbe1df';
+    if (percentile >= 36) return '#f9cdc9';
+    if (percentile >= 31) return '#f7b9b4';
+    if (percentile >= 26) return '#f5a59f';
+    if (percentile >= 21) return '#f2928a';
+    if (percentile >= 16) return '#f07e74';
+    if (percentile >= 11) return '#ee6a5f';
+    if (percentile >= 6) return '#ec564a';
+    return '#ea4335';
+  };
+
+  // Calculate values
+  const overallRecord = calculateRecord(games, false);
+  const conferenceRecord = calculateRecord(games, true);
+  const strengthOfSchedule = calculateStrengthOfSchedule(games, allTeamsRankings);
+  const totalTeams = allTeamsRankings ? allTeamsRankings.length : 134;
+  const sosRank = calculateSOSRank(strengthOfSchedule, allTeamsRankings);
+
+  // Mobile-friendly stat row component
+  const StatRow = ({ label, value, rank, isRecord = false, includeRankColor = true }) => (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '12px 16px',
+      borderBottom: '1px solid #dee2e6',
+      backgroundColor: '#ffffff'
+    }}>
+      <div style={{
+        fontFamily: '"Trebuchet MS", Arial, sans-serif',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        color: '#495057',
+        textTransform: 'uppercase'
+      }}>
+        {label}
+      </div>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
+          fontFamily: isRecord ? '"Trebuchet MS", Arial, sans-serif' : 'Consolas, monospace',
+          fontSize: isRecord ? '16px' : '14px',
+          fontWeight: 'bold',
+          color: '#212529'
+        }}>
+          {value}
+        </span>
+        
+        {includeRankColor && rank && rank !== 'N/A' && (
+          <span style={{
+            backgroundColor: getPercentileColor(rank, totalTeams),
+            color: '#000',
+            padding: '3px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            fontFamily: 'Consolas, monospace',
+            border: '1px solid rgba(0,0,0,0.1)',
+            minWidth: '35px',
+            textAlign: 'center'
+          }}>
+            #{rank}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: '30px' }}>
+      <h2 style={{ 
+        borderBottom: '2px solid #dee2e6', 
+        paddingBottom: '10px',
+        fontFamily: '"Trebuchet MS", Arial, sans-serif',
+        marginBottom: '16px'
+      }}>
+        2024 Season Summary
+      </h2>
+      
+      {/* Mobile-optimized vertical layout */}
+      <div style={{
+        border: '1px solid #dee2e6',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        backgroundColor: '#ffffff'
+      }}>
+        <StatRow 
+          label="Overall Record" 
+          value={overallRecord} 
+          isRecord={true}
+          includeRankColor={false}
+        />
+        
+        <StatRow 
+          label="Conference Record" 
+          value={conferenceRecord} 
+          isRecord={true}
+          includeRankColor={false}
+        />
+        
+        <StatRow 
+          label="Overall Rating" 
+          value={teamData?.power_rating?.toFixed(1) || 'N/A'} 
+          rank={teamData?.power_rank}
+        />
+        
+        <StatRow 
+          label="Offense Rating" 
+          value={teamData?.offense_rating?.toFixed(1) || 'N/A'} 
+          rank={teamData?.offense_rank}
+        />
+        
+        <StatRow 
+          label="Defense Rating" 
+          value={teamData?.defense_rating?.toFixed(1) || 'N/A'} 
+          rank={teamData?.defense_rank}
+        />
+        
+        <StatRow 
+          label="Strength of Schedule" 
+          value={strengthOfSchedule ? strengthOfSchedule.toFixed(1) : 'N/A'} 
+          rank={sosRank}
+        />
+      </div>
+      
+      <div style={{
+        marginTop: '12px',
+        fontSize: '11px',
+        color: '#6c757d',
+        fontStyle: 'italic',
+        lineHeight: '1.4'
+      }}>
+        <strong>Notes:</strong> Strength of Schedule is the average power rating of all opponents played. 
+        Conference Record includes only games marked as conference games. 
+        Rankings shown with percentile colors (Green = Elite, Red = Poor).
+      </div>
+    </div>
+  );
+};
 
   // Helper Functions
   const calculateRecord = (games) => {
@@ -1804,22 +1916,23 @@ function TeamPage() {
       {/* Content Area */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
         
-         <CondensedSeasonSummary 
-          teamData={teamData} 
-          games={games} 
-          allTeamsRankings={allTeamsRankings} 
-        />
+         <VerticalSeasonSummary 
+            teamData={teamData} 
+            games={games} 
+            allTeamsRankings={allTeamsRankings} 
+          />
 
         {/* Completed Games */}
         <div style={{ marginBottom: '30px' }}>
           <h2 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '10px' }}>
             Completed Games
           </h2>
-          <CompletedGamesTable 
+          <EnhancedCompletedGamesTable 
             games={games} 
             teamName={teamName} 
-            allTeamsRankings={allTeamsRankings} 
-          />
+            allTeamsRankings={allTeamsRankings}
+            stats={stats}
+/>
         </div>
 
         {/* Advanced Stats */}

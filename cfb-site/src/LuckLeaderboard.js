@@ -17,7 +17,7 @@ const LuckLeaderboard = () => {
     try {
       setLoading(true);
       
-      const API_URL = 'https://cfb-api-production.up.railway.app';
+      const API_URL = process.env.REACT_APP_API_URL || 'https://cfbapi-production.up.railway.app';
       
       const params = new URLSearchParams({
         includePostseason: (!regularSeasonOnly).toString(),

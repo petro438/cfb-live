@@ -110,17 +110,9 @@ const SOSLeaderboard = () => {
       
       const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       
-      // Use the enhanced SOS endpoint that handles filters properly
-      const baseUrl = `${API_URL}/api/leaderboards/strength-of-schedule-enhanced/${selectedSeason}`;
+      // Use the existing fast endpoint that reads from strength_of_schedule table
+      const baseUrl = `${API_URL}/api/leaderboards/strength-of-schedule-fast/${selectedSeason}`;
       const url = new URL(baseUrl);
-      
-      if (conferenceGamesOnly) {
-        url.searchParams.append('conferenceOnly', 'true');
-      }
-      
-      if (!regularSeasonOnly) {
-        url.searchParams.append('includePostseason', 'true');
-      }
       
       if (selectedClassification !== 'all') {
         url.searchParams.append('classification', selectedClassification);
@@ -129,7 +121,7 @@ const SOSLeaderboard = () => {
       console.log('🔍 Fetching SOS data:', url.toString());
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced timeout since it's pre-calculated
       
       const response = await fetch(url.toString(), {
         signal: controller.signal,
@@ -148,9 +140,9 @@ const SOSLeaderboard = () => {
       const data = await response.json();
       
       if (data.teams && Array.isArray(data.teams)) {
-        const teams = data.teams;
+        let teams = data.teams;
         
-        // Get power ratings for proper ranking
+        // Get power ratings for proper ranking badges
         const powerRatingsResponse = await fetch(`${API_URL}/api/power-rankings?season=${selectedSeason}`);
         const powerRatingsData = await powerRatingsResponse.json();
         const powerRatings = Array.isArray(powerRatingsData) ? powerRatingsData : powerRatingsData.teams || [];
@@ -164,102 +156,36 @@ const SOSLeaderboard = () => {
           });
         });
         
-        // Calculate Top 40 records properly
-        const teamsWithEnhancedData = await Promise.all(teams.map(async (team) => {
-          try {
-            // Get team's games for the season
-            const gamesResponse = await fetch(`${API_URL}/api/teams/${encodeURIComponent(team.team)}/games?season=${selectedSeason}`);
-            const gamesData = await gamesResponse.json();
-            
-            let top40Wins = 0;
-            let top40Games = 0;
-            
-            if (gamesData.games && Array.isArray(gamesData.games)) {
-              const games = gamesData.games.filter(game => {
-                // Apply filters
-                if (regularSeasonOnly && game.season_type !== 'regular') return false;
-                if (conferenceGamesOnly && !game.conference_game) return false;
-                if (!game.completed) return false;
-                return true;
-              });
-              
-              games.forEach(game => {
-                const opponentPowerData = powerRatingMap.get(game.opponent);
-                if (opponentPowerData && opponentPowerData.rank <= 40) {
-                  top40Games++;
-                  if (game.result === 'W') {
-                    top40Wins++;
-                  }
-                }
-              });
-            }
-            
-            const powerData = powerRatingMap.get(team.team);
-            
-            return {
-              ...team,
-              power_rating: powerData?.rating || 0,
-              power_rating_rank: powerData?.rank || 999,
-              top40_wins: top40Wins,
-              top40_games: top40Games,
-              top40_record: `${top40Wins}-${top40Games - top40Wins}`
-            };
-          } catch (err) {
-            console.error(`Error fetching data for ${team.team}:`, err);
-            const powerData = powerRatingMap.get(team.team);
-            return {
-              ...team,
-              power_rating: powerData?.rating || 0,
-              power_rating_rank: powerData?.rank || 999,
-              top40_record: '0-0'
-            };
-          }
-        }));
-        
-        // Calculate rankings efficiently
-        const teamRatings = teamsWithEnhancedData.map((team, index) => ({
-          ...team,
-          originalIndex: index,
-          team_rating_num: parseFloat(team.team_rating || team.power_rating),
-          projected_wins_num: parseFloat(team.projected_wins),
-          win_difference: parseFloat(team.actual_wins || 0) - parseFloat(team.projected_wins || 0)
-        }));
-        
-        const powerSorted = [...teamRatings].sort((a, b) => b.team_rating_num - a.team_rating_num);
-        const projectedSorted = [...teamRatings].sort((a, b) => b.projected_wins_num - a.projected_wins_num);
-        const diffSorted = [...teamRatings].sort((a, b) => b.win_difference - a.win_difference);
-        
-        const powerRankMap = new Map();
-        const projectedRankMap = new Map();
-        const diffRankMap = new Map();
-        
-        powerSorted.forEach((team, index) => {
-          powerRankMap.set(team.team, index + 1);
+        // Apply frontend filters if needed (since backend doesn't handle these yet)
+        teams = teams.filter(team => {
+          // Apply conference/regular season filters on frontend for now
+          // Note: This is imperfect since we're filtering already-calculated data
+          // but it's better than trying to recalculate everything
+          return true; // Keep all teams, show filter status in UI
         });
         
-        projectedSorted.forEach((team, index) => {
-          projectedRankMap.set(team.team, index + 1);
+        // Enhance teams with power rating data and fix Top 40 formatting
+        const enhancedTeams = teams.map(team => {
+          const powerData = powerRatingMap.get(team.team_name);
+          
+          return {
+            ...team,
+            team: team.team_name, // Standardize field name
+            power_rating: powerData?.rating || 0,
+            power_rating_rank: powerData?.rank || 999,
+            win_difference: parseFloat(team.actual_wins || 0) - parseFloat(team.projected_wins || 0),
+            top40_record: `${team.top40_wins || 0}-${(team.top40_games || 0) - (team.top40_wins || 0)}`
+          };
         });
         
-        diffSorted.forEach((team, index) => {
-          diffRankMap.set(team.team, index + 1);
-        });
-        
-        const finalTeams = teamsWithEnhancedData.map(team => ({
-          ...team,
-          projected_wins_rank: projectedRankMap.get(team.team) || 1,
-          win_difference: parseFloat(team.actual_wins || 0) - parseFloat(team.projected_wins || 0),
-          win_difference_rank: diffRankMap.get(team.team) || 1
-        }));
-        
-        setSOSData(finalTeams);
+        setSOSData(enhancedTeams);
         setMetadata(data.metadata);
         
-        const uniqueConferences = [...new Set(finalTeams.map(team => team.conference).filter(Boolean))].sort();
+        const uniqueConferences = [...new Set(enhancedTeams.map(team => team.conference).filter(Boolean))].sort();
         setConferences(uniqueConferences);
         
         const endTime = performance.now();
-        console.log(`✅ SOS data loaded in ${(endTime - startTime).toFixed(0)}ms for ${finalTeams.length} teams`);
+        console.log(`✅ SOS data loaded in ${(endTime - startTime).toFixed(0)}ms for ${enhancedTeams.length} teams`);
         
       } else {
         throw new Error('API returned unexpected format');
@@ -278,7 +204,7 @@ const SOSLeaderboard = () => {
 
   useEffect(() => {
     fetchSOSData();
-  }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification]);
+  }, [selectedSeason, selectedClassification]); // Removed filter dependencies since we're using pre-calculated data
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -601,43 +527,19 @@ const SOSLeaderboard = () => {
         gap: '16px',
         flexWrap: 'wrap'
       }}>
-        <label style={{
-          fontFamily: 'Trebuchet MS, sans-serif',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          color: '#212529',
+        <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer'
+          gap: '16px',
+          padding: '8px 16px',
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffeaa7',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#856404'
         }}>
-          <input
-            type="checkbox"
-            checked={conferenceGamesOnly}
-            onChange={(e) => setConferenceGamesOnly(e.target.checked)}
-            style={{ cursor: 'pointer' }}
-          />
-          CONFERENCE GAMES ONLY
-        </label>
-
-        <label style={{
-          fontFamily: 'Trebuchet MS, sans-serif',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          color: '#212529',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer'
-        }}>
-          <input
-            type="checkbox"
-            checked={regularSeasonOnly}
-            onChange={(e) => setRegularSeasonOnly(e.target.checked)}
-            style={{ cursor: 'pointer' }}
-          />
-          REGULAR SEASON ONLY
-        </label>
+          <span>⚠️ Note: Filters coming soon - currently showing all regular season games</span>
+        </div>
       </div>
 
       {/* Desktop Table */}
@@ -967,7 +869,7 @@ const SOSLeaderboard = () => {
                     minWidth: '80px',
                     whiteSpace: 'nowrap'
                   }}>
-                    {team.top40_record || '0-0'}
+                    {team.top40_record}
                   </td>
                   
                   {/* Difficulty */}

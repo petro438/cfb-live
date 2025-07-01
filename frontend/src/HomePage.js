@@ -606,11 +606,12 @@ function HomePage() {
         }
       </div>
       
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', margin: '0 auto', maxWidth: '1000px' }}>
         <table style={{ 
           width: '100%', 
           borderCollapse: 'collapse', 
-          border: '1px solid #dee2e6'
+          border: '1px solid #dee2e6',
+          tableLayout: 'fixed'
         }}>
           <thead>
             <tr style={{ backgroundColor: '#f8f9fa' }}>
@@ -635,7 +636,9 @@ function HomePage() {
                 fontSize: '11px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
-                minWidth: '220px'
+                minWidth: isMobile ? '150px' : '180px',
+                maxWidth: isMobile ? '150px' : '220px',
+                width: isMobile ? '150px' : '200px'
               }}>
                 TEAM
               </th>
@@ -696,7 +699,7 @@ function HomePage() {
           <tbody>
             {sortedData.map((team, index) => {
               const currentRank = sortField === 'powerRating' ? team.displayPowerRank : index + 1;
-              const displayName = team.teamName.length > 15 ? team.abbreviation : team.teamName;
+              const displayName = team.teamName;
               
               return (
                 <tr key={team.teamName} style={{ backgroundColor: index % 2 === 1 ? '#f8f9fa' : '#ffffff' }}>
@@ -719,7 +722,9 @@ function HomePage() {
                       padding: '6px 8px',
                       border: '1px solid #dee2e6',
                       backgroundColor: '#ffffff',
-                      minWidth: '220px'
+                      minWidth: isMobile ? '150px' : '180px',
+                      maxWidth: isMobile ? '150px' : '220px',
+                      width: isMobile ? '150px' : '200px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <img 

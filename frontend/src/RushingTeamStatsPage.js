@@ -24,7 +24,12 @@ const RushingStatsPage = () => {
   const [sortConfig, setSortConfig] = useState({ key: 'rushing_rate', direction: 'desc' });
   const [conferenceRankingMode, setConferenceRankingMode] = useState('national'); // 'national' or 'conference'
 
-  // Fetch data
+  // Reset conference ranking mode when switching to 'all' conferences
+  useEffect(() => {
+    if (selectedConference === 'all') {
+      setConferenceRankingMode('national');
+    }
+  }, [selectedConference]);
   useEffect(() => {
     const fetchRushingStats = async () => {
       setLoading(true);
@@ -173,11 +178,14 @@ const RushingStatsPage = () => {
     
     stats.forEach((stat, statIndex) => {
       console.log(`🔢 Processing stat ${statIndex + 1}/${stats.length}: ${stat}`);
+      console.log(`📊 Conference ranking mode: ${conferenceRankingMode}, Selected conference: ${selectedConference}`);
       
       // Determine ranking universe based on conference ranking mode
       const rankingUniverse = conferenceRankingMode === 'conference' && selectedConference !== 'all' 
         ? rankedTeams.filter(team => team.conference === selectedConference)
         : rankedTeams;
+      
+      console.log(`🎯 Ranking universe: ${rankingUniverse.length} teams (${conferenceRankingMode} mode)`);
       
       // Sort values - SPECIAL HANDLING FOR DEFENSE
       let sortedValues;
@@ -199,7 +207,7 @@ const RushingStatsPage = () => {
           .sort((a, b) => b - a); // Descending for offense
       }
         
-      console.log(`📋 ${stat} values range: ${sortedValues[sortedValues.length-1]} to ${sortedValues[0]}`);
+      console.log(`📋 ${stat} values range in ${conferenceRankingMode} mode: ${sortedValues[sortedValues.length-1]} to ${sortedValues[0]}`);
         
       rankedTeams.forEach((team, teamIndex) => {
         const value = parseFloat(team[stat]);
@@ -212,8 +220,8 @@ const RushingStatsPage = () => {
         team[`${stat}_rank`] = rank;
         team[`${stat}_percentile`] = percentile;
         
-        if (teamIndex < 2) {
-          console.log(`📊 ${team.team_name}: ${stat}=${cleanValue}, rank=${rank}, percentile=${percentile.toFixed(1)}`);
+        if (teamIndex < 3 && (conferenceRankingMode === 'conference' || teamIndex < 1)) {
+          console.log(`📊 ${team.team_name} (${team.conference}): ${stat}=${cleanValue}, rank=${rank}/${rankingUniverse.length}, percentile=${percentile.toFixed(1)}%`);
         }
       });
     });

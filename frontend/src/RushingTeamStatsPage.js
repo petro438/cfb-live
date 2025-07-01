@@ -13,14 +13,16 @@ const RushingStatsPage = () => {
   const [selectedConference, setSelectedConference] = useState('all');
   const [offenseDefense, setOffenseDefense] = useState('offense');
   const [basicAdvanced, setBasicAdvanced] = useState('basic');
-  const [totalPerGame, setTotalPerGame] = useState('total');
+  const [totalPerGame, setTotalPerGame] = useState('per_game'); // Default to per game
   const [conferenceGamesOnly, setConferenceGamesOnly] = useState(false);
-  const [regularSeasonOnly, setRegularSeasonOnly] = useState(false);
+  const [regularSeasonOnly, setRegularSeasonOnly] = useState(true); // Default to regular season only
   
   // Available data
   const [availableSeasons, setAvailableSeasons] = useState(['2024', '2023']);
   const [availableConferences, setAvailableConferences] = useState([]);
+  const [allConferences, setAllConferences] = useState([]); // Store all conferences
   const [sortConfig, setSortConfig] = useState({ key: 'rushing_rate', direction: 'desc' });
+  const [conferenceRankingMode, setConferenceRankingMode] = useState('national'); // 'national' or 'conference'
 
   // Fetch data
   useEffect(() => {
@@ -52,9 +54,12 @@ const RushingStatsPage = () => {
         
         setTeams(teamsData);
         
-        // Extract unique conferences
-        const conferences = [...new Set(teamsData.map(team => team.conference))].filter(Boolean).sort();
-        setAvailableConferences(['all', ...conferences]);
+        // Extract ALL unique conferences for dropdown
+        const allConfs = [...new Set(teamsData.map(team => team.conference))].filter(Boolean).sort();
+        setAllConferences(['all', ...allConfs]);
+        
+        // Set available conferences (same as all conferences)
+        setAvailableConferences(['all', ...allConfs]);
         
       } catch (err) {
         console.error('❌ Fetch error:', err);
@@ -169,20 +174,40 @@ const RushingStatsPage = () => {
     stats.forEach((stat, statIndex) => {
       console.log(`🔢 Processing stat ${statIndex + 1}/${stats.length}: ${stat}`);
       
-      const sortedValues = rankedTeams
-        .map(team => {
-          const value = parseFloat(team[stat]);
-          return isNaN(value) ? 0 : value;
-        })
-        .sort((a, b) => b - a); // Higher is better for rushing stats
+      // Determine ranking universe based on conference ranking mode
+      const rankingUniverse = conferenceRankingMode === 'conference' && selectedConference !== 'all' 
+        ? rankedTeams.filter(team => team.conference === selectedConference)
+        : rankedTeams;
+      
+      // Sort values - SPECIAL HANDLING FOR DEFENSE
+      let sortedValues;
+      if (offenseDefense === 'defense' && stat === 'yards_per_rush') {
+        // Defense: lower yards per rush is better
+        sortedValues = rankingUniverse
+          .map(team => {
+            const value = parseFloat(team[stat]);
+            return isNaN(value) ? 999 : value; // Put invalid values at end
+          })
+          .sort((a, b) => a - b); // Ascending for defense
+      } else {
+        // Offense: higher is better for all stats
+        sortedValues = rankingUniverse
+          .map(team => {
+            const value = parseFloat(team[stat]);
+            return isNaN(value) ? 0 : value;
+          })
+          .sort((a, b) => b - a); // Descending for offense
+      }
         
       console.log(`📋 ${stat} values range: ${sortedValues[sortedValues.length-1]} to ${sortedValues[0]}`);
         
       rankedTeams.forEach((team, teamIndex) => {
         const value = parseFloat(team[stat]);
-        const cleanValue = isNaN(value) ? 0 : value;
+        const cleanValue = isNaN(value) ? (offenseDefense === 'defense' && stat === 'yards_per_rush' ? 999 : 0) : value;
+        
+        // Find rank within the appropriate universe
         const rank = sortedValues.indexOf(cleanValue) + 1;
-        const percentile = ((rankedTeams.length - rank + 1) / rankedTeams.length) * 100;
+        const percentile = ((rankingUniverse.length - rank + 1) / rankingUniverse.length) * 100;
         
         team[`${stat}_rank`] = rank;
         team[`${stat}_percentile`] = percentile;
@@ -195,7 +220,7 @@ const RushingStatsPage = () => {
     
     console.log('✅ Percentile calculations complete');
     return rankedTeams;
-  }, [processedTeams, totalPerGame]);
+  }, [processedTeams, totalPerGame, conferenceRankingMode, selectedConference, offenseDefense]);
 
   // Get percentile color
   const getPercentileColor = (percentile) => {
@@ -330,7 +355,7 @@ const RushingStatsPage = () => {
             fontFamily: '"Trebuchet MS", sans-serif'
           }}
         >
-          {availableConferences.map(conf => (
+          {allConferences.map(conf => (
             <option key={conf} value={conf}>
               {conf === 'all' ? 'ALL CONFERENCES' : conf.toUpperCase()}
             </option>
@@ -369,10 +394,10 @@ const RushingStatsPage = () => {
           ))}
         </div>
 
-        {/* BASIC/ADVANCED - Square connected buttons */}
+        {/* BASIC/ADVANCED - Red bordered buttons */}
         <div style={{
           display: 'flex',
-          border: '1px solid #6c757d',
+          border: '1px solid #dc3545',
           borderRadius: '4px',
           overflow: 'hidden'
         }}>
@@ -383,8 +408,8 @@ const RushingStatsPage = () => {
               style={{
                 padding: '8px 16px',
                 border: 'none',
-                background: basicAdvanced === type ? '#6c757d' : 'white',
-                color: basicAdvanced === type ? 'white' : '#6c757d',
+                background: basicAdvanced === type ? '#dc3545' : 'white',
+                color: basicAdvanced === type ? 'white' : '#dc3545',
                 fontFamily: '"Trebuchet MS", sans-serif',
                 fontWeight: 'bold',
                 cursor: 'pointer',
@@ -461,6 +486,33 @@ const RushingStatsPage = () => {
           />
           REGULAR SEASON ONLY
         </label>
+
+        {/* Conference Ranking Mode - Show only when filtering by conference */}
+        {selectedConference !== 'all' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontFamily: '"Trebuchet MS", sans-serif',
+            fontSize: '14px'
+          }}>
+            <span>Rankings:</span>
+            <select 
+              value={conferenceRankingMode}
+              onChange={(e) => setConferenceRankingMode(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontSize: '12px'
+              }}
+            >
+              <option value="national">National</option>
+              <option value="conference">Conference Only</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Results Summary */}

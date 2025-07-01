@@ -313,7 +313,7 @@ function HomePage() {
       textAlign: 'center',
       fontFamily: 'Consolas, monospace',
       fontWeight: 'bold',
-      width: isMobile ? '75px' : '120px'
+      width: isMobile ? '70px' : '120px'
     }}>
       <div style={{
         display: 'flex',
@@ -636,9 +636,9 @@ function HomePage() {
                 fontSize: '11px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
-                minWidth: isMobile ? '150px' : '180px',
-                maxWidth: isMobile ? '150px' : '220px',
-                width: isMobile ? '150px' : '200px'
+                minWidth: isMobile ? '140px' : '180px',
+                maxWidth: isMobile ? '140px' : '220px',
+                width: isMobile ? '140px' : '200px'
               }}>
                 TEAM
               </th>
@@ -650,7 +650,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '75px' : '120px'
+                width: isMobile ? '70px' : '120px'
               }} onClick={() => handleSort('powerRating')}>
                 RATING
                 {sortField === 'powerRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -663,7 +663,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '75px' : '120px'
+                width: isMobile ? '70px' : '120px'
               }} onClick={() => handleSort('offenseRating')}>
                 OFF
                 {sortField === 'offenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -676,7 +676,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '75px' : '120px'
+                width: isMobile ? '70px' : '120px'
               }} onClick={() => handleSort('defenseRating')}>
                 DEF
                 {sortField === 'defenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -689,7 +689,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '75px' : '120px'
+                width: isMobile ? '70px' : '120px'
               }} onClick={() => handleSort('strengthOfSchedule')}>
                 SoS
                 {sortField === 'strengthOfSchedule' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -722,9 +722,9 @@ function HomePage() {
                       padding: '6px 8px',
                       border: '1px solid #dee2e6',
                       backgroundColor: '#ffffff',
-                      minWidth: isMobile ? '150px' : '180px',
-                      maxWidth: isMobile ? '150px' : '220px',
-                      width: isMobile ? '150px' : '200px'
+                      minWidth: isMobile ? '140px' : '180px',
+                      maxWidth: isMobile ? '140px' : '220px',
+                      width: isMobile ? '140px' : '200px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <img 

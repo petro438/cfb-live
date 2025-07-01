@@ -536,7 +536,7 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
-// Replace the passing stats endpoint in server.js with this corrected version
+// Replace the passing stats endpoint in server.js with this version using correct column names
 
 app.get('/api/leaderboards/passing/:season', async (req, res) => {
   try {
@@ -552,19 +552,18 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     console.log(`🏈 Fetching passing stats: ${view_type} ${stat_type} for ${season}`);
     console.log(`📊 Filters: season_type=${season_type}, conference_only=${conference_only}, conference=${conference}`);
     
-    // STEP 1: Check if game_team_stats_new table exists and has data
+    // STEP 1: Check if game_team_stats_new table has data
     const tableCheck = await pool.query(`
       SELECT COUNT(*) as count
       FROM game_team_stats_new 
-      WHERE passing_completions IS NOT NULL
+      WHERE completions IS NOT NULL
     `);
     
     console.log('📋 Table check:', tableCheck.rows[0]);
     
     if (parseInt(tableCheck.rows[0].count) === 0) {
       return res.status(404).json({
-        error: 'No passing data found in game_team_stats_new table',
-        details: 'The game_team_stats_new table appears to be empty or missing passing data'
+        error: 'No passing data found in game_team_stats_new table'
       });
     }
     
@@ -585,8 +584,6 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
       gameQuery += ` AND conference_game = true`;
     }
     
-    console.log('🎮 Game query:', gameQuery);
-    
     const gamesResult = await pool.query(gameQuery, gameParams);
     const gameIds = gamesResult.rows.map(g => g.id);
     
@@ -595,16 +592,11 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     if (gameIds.length === 0) {
       return res.json({
         teams: [],
-        metadata: {
-          season: parseInt(season),
-          view_type,
-          stat_type,
-          message: 'No completed games found for the specified filters'
-        }
+        metadata: { season: parseInt(season), message: 'No games found' }
       });
     }
     
-    // STEP 3: Get team stats for those games using correct column names
+    // STEP 3: Get team stats using correct column names
     let statsQuery;
     
     if (view_type === 'offense') {
@@ -613,13 +605,15 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
         SELECT 
           gts.team,
           COUNT(DISTINCT gts.game_id) as games_played,
-          SUM(COALESCE(gts.passing_completions, 0)) as completions,
+          SUM(COALESCE(gts.completions, 0)) as completions,
           SUM(COALESCE(gts.passing_attempts, 0)) as attempts,
           SUM(COALESCE(gts.net_passing_yards, 0)) as net_passing_yards,
           SUM(COALESCE(gts.passing_tds, 0)) as passing_touchdowns,
           SUM(COALESCE(gts.interceptions_thrown, 0)) as interceptions,
-          SUM(COALESCE(gts.sacks_allowed, 0)) as sacks_allowed
+          -- For offense, get sacks from opponent stats (sacks they recorded against us)
+          COALESCE(SUM(opp.sacks), 0) as sacks_allowed
         FROM game_team_stats_new gts
+        LEFT JOIN game_team_stats_new opp ON gts.game_id = opp.game_id AND opp.team != gts.team
         WHERE gts.game_id = ANY($1)
         GROUP BY gts.team
         HAVING COUNT(DISTINCT gts.game_id) > 0
@@ -631,11 +625,12 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
         SELECT 
           gts.team,
           COUNT(DISTINCT gts.game_id) as games_played,
-          SUM(COALESCE(opp.passing_completions, 0)) as completions,
+          SUM(COALESCE(opp.completions, 0)) as completions,
           SUM(COALESCE(opp.passing_attempts, 0)) as attempts,
           SUM(COALESCE(opp.net_passing_yards, 0)) as net_passing_yards,
           SUM(COALESCE(opp.passing_tds, 0)) as passing_touchdowns,
           SUM(COALESCE(opp.interceptions_thrown, 0)) as interceptions,
+          -- For defense, sacks are what we recorded
           SUM(COALESCE(gts.sacks, 0)) as sacks_allowed
         FROM game_team_stats_new gts
         JOIN game_team_stats_new opp ON gts.game_id = opp.game_id AND opp.team != gts.team
@@ -646,7 +641,7 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
       `;
     }
     
-    console.log('📈 Stats query:', statsQuery.substring(0, 200) + '...');
+    console.log('📈 Executing stats query...');
     
     const statsResult = await pool.query(statsQuery, [gameIds]);
     const rawStats = statsResult.rows;
@@ -656,12 +651,7 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     if (rawStats.length === 0) {
       return res.json({
         teams: [],
-        metadata: {
-          season: parseInt(season),
-          view_type,
-          stat_type,
-          message: 'No team stats found for the specified games'
-        }
+        metadata: { season: parseInt(season), message: 'No team stats found' }
       });
     }
     
@@ -744,7 +734,6 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     res.status(500).json({ 
       error: 'Internal server error', 
       details: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       endpoint: '/api/leaderboards/passing/:season'
     });
   }

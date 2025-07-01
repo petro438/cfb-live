@@ -650,7 +650,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '50px' : '100px'
+                width: isMobile ? '45px' : '100px'
               }} onClick={() => handleSort('powerRating')}>
                 RATING
                 {sortField === 'powerRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -663,7 +663,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '50px' : '100px'
+                width: isMobile ? '45px' : '100px'
               }} onClick={() => handleSort('offenseRating')}>
                 OFF
                 {sortField === 'offenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -676,7 +676,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '50px' : '100px'
+                width: isMobile ? '45px' : '100px'
               }} onClick={() => handleSort('defenseRating')}>
                 DEF
                 {sortField === 'defenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -689,7 +689,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: isMobile ? '50px' : '100px'
+                width: isMobile ? '45px' : '100px'
               }} onClick={() => handleSort('strengthOfSchedule')}>
                 SoS
                 {sortField === 'strengthOfSchedule' && (sortDirection === 'asc' ? '↑' : '↓')}

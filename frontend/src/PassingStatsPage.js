@@ -10,7 +10,7 @@ const PassingStatsPage = () => {
   const [selectedConference, setSelectedConference] = useState('all');
   const [viewType, setViewType] = useState('offense'); // offense or defense
   const [statCategory, setStatCategory] = useState('basic'); // basic or advanced
-  const [statType, setStatType] = useState('total'); // total or per_game
+  const [statType, setStatType] = useState('per_game'); // total or per_game
   const [conferenceOnly, setConferenceOnly] = useState(false);
   const [regularSeasonOnly, setRegularSeasonOnly] = useState(true);
   
@@ -69,8 +69,8 @@ const PassingStatsPage = () => {
               return a[field] - b[field]; // Lower is better (less allowed)
             }
           } else {
-            // For OFFENSE: Higher is better for everything except interceptions
-            if (field === 'interceptions') {
+            // For OFFENSE: Higher is better for everything except interceptions and sacks_allowed
+            if (field === 'interceptions' || field === 'sacks_allowed') {
               return a[field] - b[field]; // Lower is better
             } else {
               return b[field] - a[field]; // Higher is better
@@ -193,6 +193,11 @@ const PassingStatsPage = () => {
       return Number(num).toFixed(1); // Always 1 decimal
     }
     
+    // Games played: no decimals regardless of filter
+    if (field === 'games_played') {
+      return Number(num).toFixed(0);
+    }
+    
     if (statType === 'per_game') {
       return Number(num).toFixed(1); // 1 decimal for per-game
     }
@@ -308,220 +313,236 @@ const PassingStatsPage = () => {
         </h1>
       </div>
 
-      {/* Top Row: Season & Conference */}
+      {/* Top Row: Season & Conference - Centered */}
       <div style={{ 
         marginBottom: '12px',
         display: 'flex',
-        gap: '16px',
-        alignItems: 'center',
+        justifyContent: 'center',
         flexWrap: 'wrap'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ 
-            fontFamily: 'Trebuchet MS, sans-serif', 
-            fontSize: '12px', 
-            fontWeight: 'bold',
-            color: '#212529'
-          }}>
-            SEASON:
-          </label>
-          <select 
-            value={selectedSeason} 
-            onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
-            style={{
-              padding: '6px 8px',
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '12px'
-            }}
-          >
-            <option value={2024}>2024</option>
-            <option value={2023}>2023</option>
-          </select>
-        </div>
+        <div style={{ 
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ 
+              fontFamily: 'Trebuchet MS, sans-serif', 
+              fontSize: '12px', 
+              fontWeight: 'bold',
+              color: '#212529'
+            }}>
+              SEASON:
+            </label>
+            <select 
+              value={selectedSeason} 
+              onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
+              style={{
+                padding: '6px 8px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '12px'
+              }}
+            >
+              <option value={2024}>2024</option>
+              <option value={2023}>2023</option>
+            </select>
+          </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ 
-            fontFamily: 'Trebuchet MS, sans-serif', 
-            fontSize: '12px', 
-            fontWeight: 'bold',
-            color: '#212529'
-          }}>
-            CONFERENCE:
-          </label>
-          <select 
-            value={selectedConference} 
-            onChange={(e) => setSelectedConference(e.target.value)}
-            style={{
-              padding: '6px 8px',
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '12px'
-            }}
-          >
-            <option value="all">All Conferences</option>
-            {availableConferences.map(conf => (
-              <option key={conf} value={conf}>{conf}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ 
+              fontFamily: 'Trebuchet MS, sans-serif', 
+              fontSize: '12px', 
+              fontWeight: 'bold',
+              color: '#212529'
+            }}>
+              CONFERENCE:
+            </label>
+            <select 
+              value={selectedConference} 
+              onChange={(e) => setSelectedConference(e.target.value)}
+              style={{
+                padding: '6px 8px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '12px'
+              }}
+            >
+              <option value="all">All Conferences</option>
+              {availableConferences.map(conf => (
+                <option key={conf} value={conf}>{conf}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Middle Row: Page-Specific Button Groups */}
+      {/* Middle Row: Page-Specific Button Groups - Centered */}
       <div style={{ 
         marginBottom: '12px',
         display: 'flex',
-        gap: '16px',
-        alignItems: 'center',
+        justifyContent: 'center',
         flexWrap: 'wrap'
       }}>
-        {/* Offense/Defense Toggle - Style 1: Rounded buttons */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button
-            onClick={() => setViewType('offense')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: viewType === 'offense' ? '#007bff' : '#f8f9fa',
-              color: viewType === 'offense' ? 'white' : '#212529',
-              border: '1px solid #007bff',
-              borderRadius: '16px',
-              cursor: 'pointer',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            OFFENSE
-          </button>
-          <button
-            onClick={() => setViewType('defense')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: viewType === 'defense' ? '#007bff' : '#f8f9fa',
-              color: viewType === 'defense' ? 'white' : '#212529',
-              border: '1px solid #007bff',
-              borderRadius: '16px',
-              cursor: 'pointer',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            DEFENSE
-          </button>
-        </div>
+        <div style={{ 
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}>
+          {/* Offense/Defense Toggle - Style 1: Rounded buttons */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => setViewType('offense')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: viewType === 'offense' ? '#007bff' : '#f8f9fa',
+                color: viewType === 'offense' ? 'white' : '#212529',
+                border: '1px solid #007bff',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              OFFENSE
+            </button>
+            <button
+              onClick={() => setViewType('defense')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: viewType === 'defense' ? '#007bff' : '#f8f9fa',
+                color: viewType === 'defense' ? 'white' : '#212529',
+                border: '1px solid #007bff',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              DEFENSE
+            </button>
+          </div>
 
-        {/* Basic/Advanced Toggle - Style 2: Square buttons */}
-        <div style={{ display: 'flex', gap: '2px', border: '1px solid #6c757d', borderRadius: '4px' }}>
-          <button
-            onClick={() => setStatCategory('basic')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: statCategory === 'basic' ? '#6c757d' : '#ffffff',
-              color: statCategory === 'basic' ? 'white' : '#6c757d',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            BASIC
-          </button>
-          <button
-            onClick={() => setStatCategory('advanced')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: statCategory === 'advanced' ? '#6c757d' : '#ffffff',
-              color: statCategory === 'advanced' ? 'white' : '#6c757d',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            ADVANCED
-          </button>
-        </div>
+          {/* Basic/Advanced Toggle - Style 2: Square buttons */}
+          <div style={{ display: 'flex', gap: '2px', border: '1px solid #6c757d', borderRadius: '4px' }}>
+            <button
+              onClick={() => setStatCategory('basic')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: statCategory === 'basic' ? '#6c757d' : '#ffffff',
+                color: statCategory === 'basic' ? 'white' : '#6c757d',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              BASIC
+            </button>
+            <button
+              onClick={() => setStatCategory('advanced')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: statCategory === 'advanced' ? '#6c757d' : '#ffffff',
+                color: statCategory === 'advanced' ? 'white' : '#6c757d',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              ADVANCED
+            </button>
+          </div>
 
-        {/* Total/Per Game Toggle - Style 3: Underlined tabs */}
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <button
-            onClick={() => setStatType('total')}
-            style={{
-              padding: '6px 0px',
-              backgroundColor: 'transparent',
-              color: statType === 'total' ? '#28a745' : '#6c757d',
-              border: 'none',
-              borderBottom: statType === 'total' ? '2px solid #28a745' : '2px solid transparent',
-              cursor: 'pointer',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            TOTAL
-          </button>
-          <button
-            onClick={() => setStatType('per_game')}
-            style={{
-              padding: '6px 0px',
-              backgroundColor: 'transparent',
-              color: statType === 'per_game' ? '#28a745' : '#6c757d',
-              border: 'none',
-              borderBottom: statType === 'per_game' ? '2px solid #28a745' : '2px solid transparent',
-              cursor: 'pointer',
-              fontFamily: 'Trebuchet MS, sans-serif',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}
-          >
-            PER GAME
-          </button>
+          {/* Total/Per Game Toggle - Style 3: Green bordered buttons */}
+          <div style={{ display: 'flex', gap: '2px', border: '1px solid #28a745', borderRadius: '4px' }}>
+            <button
+              onClick={() => setStatType('total')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: statType === 'total' ? '#28a745' : '#ffffff',
+                color: statType === 'total' ? 'white' : '#28a745',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              TOTAL
+            </button>
+            <button
+              onClick={() => setStatType('per_game')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: statType === 'per_game' ? '#28a745' : '#ffffff',
+                color: statType === 'per_game' ? 'white' : '#28a745',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              PER GAME
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Bottom Row: Checkboxes */}
+      {/* Bottom Row: Checkboxes - Centered */}
       <div style={{ 
         marginBottom: '16px',
         display: 'flex',
-        gap: '16px',
-        alignItems: 'center'
+        justifyContent: 'center',
+        flexWrap: 'wrap'
       }}>
-        <label style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '6px',
-          fontFamily: 'Trebuchet MS, sans-serif',
-          fontSize: '12px',
-          cursor: 'pointer'
+        <div style={{ 
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'center'
         }}>
-          <input
-            type="checkbox"
-            checked={conferenceOnly}
-            onChange={(e) => setConferenceOnly(e.target.checked)}
-          />
-          CONFERENCE GAMES ONLY
-        </label>
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontFamily: 'Trebuchet MS, sans-serif',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={conferenceOnly}
+              onChange={(e) => setConferenceOnly(e.target.checked)}
+            />
+            CONFERENCE GAMES ONLY
+          </label>
 
-        <label style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '6px',
-          fontFamily: 'Trebuchet MS, sans-serif',
-          fontSize: '12px',
-          cursor: 'pointer'
-        }}>
-          <input
-            type="checkbox"
-            checked={regularSeasonOnly}
-            onChange={(e) => setRegularSeasonOnly(e.target.checked)}
-          />
-          REGULAR SEASON ONLY
-        </label>
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontFamily: 'Trebuchet MS, sans-serif',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={regularSeasonOnly}
+              onChange={(e) => setRegularSeasonOnly(e.target.checked)}
+            />
+            REGULAR SEASON ONLY
+          </label>
+        </div>
       </div>
 
       {/* Results Info */}
@@ -831,7 +852,7 @@ const PassingStatsPage = () => {
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   textAlign: 'left',
-                  width: '25%'
+                  width: '22%'
                 }}>
                   TEAM
                 </th>
@@ -855,7 +876,7 @@ const PassingStatsPage = () => {
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   textAlign: 'center',
-                  width: '10%'
+                  width: '9%'
                 }}>
                   CMP
                 </th>
@@ -867,7 +888,7 @@ const PassingStatsPage = () => {
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   textAlign: 'center',
-                  width: '10%'
+                  width: '9%'
                 }}>
                   ATT
                 </th>
@@ -882,6 +903,18 @@ const PassingStatsPage = () => {
                   width: '10%'
                 }}>
                   YDS
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '9%'
+                }}>
+                  Y/A
                 </th>
                 <th style={{
                   padding: '4px 2px',
@@ -915,7 +948,7 @@ const PassingStatsPage = () => {
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   textAlign: 'center',
-                  width: '8%'
+                  width: '7%'
                 }}>
                   SCK
                 </th>
@@ -973,6 +1006,13 @@ const PassingStatsPage = () => {
                   <CellWithRank 
                     value={formatNumber(team.passing_yards, 'passing_yards')} 
                     statKey="passing_yards" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.yards_per_attempt, 'yards_per_attempt')} 
+                    statKey="yards_per_attempt" 
                     team={team.team}
                     isDesktop={false}
                     isMobile={true}

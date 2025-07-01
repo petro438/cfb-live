@@ -1355,7 +1355,8 @@ app.get('/api/debug-columns', async (req, res) => {
   }
 });
 
-// Strength of Schedule Enhanced Endpoint
+// This replaces the existing strength-of-schedule-enhanced endpoint
+
 app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, res) => {
   try {
     const { season } = req.params;
@@ -1365,7 +1366,8 @@ app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, r
       classification = 'fbs' 
     } = req.query;
     
-    console.log(`🔍 Calculating SOS for ${season}, classification: ${classification}`);
+    console.log(`🔍 Enhanced SOS calculation for ${season}, classification: ${classification}`);
+    console.log(`📊 Filters: conferenceOnly=${conferenceOnly}, includePostseason=${includePostseason}`);
     
     // Get all teams with their power ratings for the season
     const teamsQuery = `
@@ -1400,7 +1402,7 @@ app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, r
     for (const team of teams) {
       console.log(`⚙️ Calculating SOS for ${team.team}`);
       
-      // Get all games for this team
+      // Get all games for this team with proper filtering
       let gamesQuery = `
         SELECT 
           g.*,
@@ -1480,20 +1482,23 @@ app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, r
         const teamScore = game.venue === 'home' ? game.home_points : game.away_points;
         const oppScore = game.venue === 'home' ? game.away_points : game.home_points;
         
-        if (teamScore > oppScore) {
-          actualWins++;
-          if (opponentRating.rows.length > 0) {
-            const oppRating = parseFloat(opponentRating.rows[0].power_rating);
-            const opponentRank = await pool.query(`
-              SELECT COUNT(*) + 1 as rank
-              FROM team_power_ratings tpr
-              WHERE tpr.power_rating > $1 AND tpr.season = $2
-            `, [oppRating, season]);
-            const oppRank = parseInt(opponentRank.rows[0].rank);
-            if (oppRank <= 40) top40Wins++;
+        if (teamScore !== null && oppScore !== null) {
+          if (teamScore > oppScore) {
+            actualWins++;
+            // Check if this was a top 40 win
+            if (opponentRating.rows.length > 0) {
+              const oppRating = parseFloat(opponentRating.rows[0].power_rating);
+              const opponentRank = await pool.query(`
+                SELECT COUNT(*) + 1 as rank
+                FROM team_power_ratings tpr
+                WHERE tpr.power_rating > $1 AND tpr.season = $2
+              `, [oppRating, season]);
+              const oppRank = parseInt(opponentRank.rows[0].rank);
+              if (oppRank <= 40) top40Wins++;
+            }
+          } else {
+            actualLosses++;
           }
-        } else {
-          actualLosses++;
         }
         
         // Calculate win probability for this game (simplified)
@@ -1552,7 +1557,7 @@ app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, r
         actual_wins: actualWins,
         actual_losses: actualLosses,
         projected_wins: projectedWins.toFixed(1),
-        win_difference: actualWins - projectedWins,
+        win_difference: (actualWins - projectedWins).toFixed(1),
         top40_record: `${top40Wins}-${top40Games - top40Wins}`,
         top40_games: top40Games,
         coinflip_games: coinflipGames,
@@ -1586,9 +1591,98 @@ app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, r
     });
     
   } catch (err) {
-    console.error('❌ Error calculating SOS:', err);
+    console.error('❌ Error calculating enhanced SOS:', err);
     res.status(500).json({ 
       error: 'Internal server error', 
+      details: err.message 
+    });
+  }
+});
+
+// Also update your games endpoint to include result calculation
+// Find your existing /api/teams/:teamName/games endpoint and update it:
+
+app.get('/api/teams/:teamName/games', async (req, res) => {
+  try {
+    const { teamName } = req.params;
+    const season = parseInt(req.query.season) || 2024;
+    
+    console.log(`🏈 Getting games for team: "${teamName}", season: ${season}`);
+    
+    // Get the actual team name from teams table (case-insensitive)
+    const teamResult = await pool.query(`
+      SELECT school, conference, classification, logo_url
+      FROM teams 
+      WHERE LOWER(school) = LOWER($1)
+      LIMIT 1
+    `, [teamName]);
+    
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Team not found',
+        requested_team: teamName
+      });
+    }
+    
+    const actualTeamName = teamResult.rows[0].school;
+    console.log(`📝 Found team: "${actualTeamName}"`);
+    
+    // Get games using the actual team name
+    const gamesResult = await pool.query(`
+      SELECT 
+        g.*,
+        CASE 
+          WHEN g.home_team = $1 THEN g.away_team
+          ELSE g.home_team
+        END as opponent,
+        CASE 
+          WHEN g.home_team = $1 THEN 'home'
+          WHEN g.neutral_site = true THEN 'neutral'
+          ELSE 'away'
+        END as venue,
+        -- Get opponent info
+        opp_teams.conference as opponent_conference,
+        opp_teams.logo_url as opponent_logo,
+        -- Get opponent ratings if available
+        opp_ratings.power_rating as opponent_rating
+      FROM games g
+      LEFT JOIN teams opp_teams ON opp_teams.school = CASE 
+        WHEN g.home_team = $1 THEN g.away_team
+        ELSE g.home_team
+      END
+      LEFT JOIN team_power_ratings opp_ratings ON opp_ratings.team_name = CASE 
+        WHEN g.home_team = $1 THEN g.away_team
+        ELSE g.home_team
+      END AND opp_ratings.season = $2
+      WHERE (g.home_team = $1 OR g.away_team = $1) 
+        AND g.season = $2
+      ORDER BY g.week, g.start_date
+    `, [actualTeamName, season]);
+    
+    console.log(`📊 Found ${gamesResult.rows.length} games for ${actualTeamName} in ${season}`);
+    
+    res.json({
+      team: actualTeamName,
+      season: season,
+      total_games: gamesResult.rows.length,
+      games: gamesResult.rows.map(game => ({
+        ...game,
+        team_score: game.home_team === actualTeamName ? game.home_points : game.away_points,
+        opponent_score: game.home_team === actualTeamName ? game.away_points : game.home_points,
+        result: game.completed && game.home_points !== null && game.away_points !== null ? 
+          (game.home_team === actualTeamName ? 
+            (game.home_points > game.away_points ? 'W' : 
+             game.home_points < game.away_points ? 'L' : 'T') :
+            (game.away_points > game.home_points ? 'W' : 
+             game.away_points < game.home_points ? 'L' : 'T')
+          ) : null
+      }))
+    });
+    
+  } catch (err) {
+    console.error('❌ Error getting team games:', err);
+    res.status(500).json({ 
+      error: 'Internal server error',
       details: err.message 
     });
   }
@@ -1837,99 +1931,6 @@ app.get('/api/leaderboards/luck/:season', async (req, res) => {
       error: 'Internal server error', 
       details: err.message 
     });
-  }
-});
-
-// FAST SOS Endpoint - reads from pre-calculated table
-app.get('/api/leaderboards/strength-of-schedule-fast/:season', async (req, res) => {
-  try {
-    const { season } = req.params;
-    const { classification = 'fbs' } = req.query;
-    
-    console.log(`🚀 Fast SOS fetch for ${season}`);
-    const start = Date.now();
-    
-    const result = await pool.query(`
-      SELECT 
-        sos.*,
-        t.logo_url,
-        t.conference,
-        t.abbreviation
-      FROM strength_of_schedule sos
-      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(sos.team_name))
-      WHERE sos.season = $1 AND sos.classification = $2
-      ORDER BY sos.sos_rank
-    `, [season, classification]);
-    
-    console.log(`✅ Fast SOS: ${result.rows.length} teams in ${Date.now() - start}ms`);
-    
-    res.json({
-      teams: result.rows,
-      metadata: {
-        season: parseInt(season),
-        total_teams: result.rows.length,
-        last_calculated: result.rows[0]?.last_updated,
-        calculation_time: `${Date.now() - start}ms (pre-calculated)`
-      }
-    });
-    
-  } catch (err) {
-    console.error('❌ Fast SOS error:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
-  }
-});
-
-// FAST Luck Endpoint - reads from pre-calculated table
-app.get('/api/leaderboards/luck-fast/:season', async (req, res) => {
-  try {
-    const { season } = req.params;
-    const { conference } = req.query;
-    
-    console.log(`🍀 Fast Luck fetch for ${season}`);
-    const start = Date.now();
-    
-    let query = `
-      SELECT 
-        la.*,
-        t.logo_url,
-        t.abbreviation,
-        CONCAT(la.wins, '-', la.losses) as record,
-        CASE 
-          WHEN la.close_game_total > 0 
-          THEN CONCAT(la.close_game_wins, '-', (la.close_game_total - la.close_game_wins))
-          ELSE '0-0'
-        END as close_game_record
-      FROM luck_analysis la
-      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(la.team_name))
-      WHERE la.season = $1
-    `;
-    
-    const params = [season];
-    
-    if (conference && conference !== 'all') {
-      query += ` AND la.conference = $2`;
-      params.push(conference);
-    }
-    
-    query += ` ORDER BY la.expected_vs_actual DESC`;
-    
-    const result = await pool.query(query, params);
-    
-    console.log(`✅ Fast Luck: ${result.rows.length} teams in ${Date.now() - start}ms`);
-    
-    res.json({
-      teams: result.rows,
-      metadata: {
-        season: parseInt(season),
-        total_teams: result.rows.length,
-        last_calculated: result.rows[0]?.last_updated,
-        calculation_time: `${Date.now() - start}ms (pre-calculated)`
-      }
-    });
-    
-  } catch (err) {
-    console.error('❌ Fast Luck error:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
 

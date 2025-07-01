@@ -56,7 +56,7 @@ const StatCell = ({ value, rank, isHigherBetter = true, totalForPercentiles, sho
       textAlign: 'center',
       fontFamily: 'Consolas, monospace',
       fontWeight: 'bold',
-      width: '80px' // Reduced from 100px
+      width: '80px'
     }}>
       <div style={{
         display: 'flex',
@@ -88,17 +88,25 @@ const SOSLeaderboard = () => {
   const [metadata, setMetadata] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('overall');
+  
+  // Default to "remaining" for 2025 season, "overall" for others
+  const [selectedSeason, setSelectedSeason] = useState('2024');
+  const [activeTab, setActiveTab] = useState(selectedSeason === '2025' ? 'remaining' : 'overall');
+  
   const [sortConfig, setSortConfig] = useState({ key: 'sos_rank', direction: 'asc' });
   const [selectedConference, setSelectedConference] = useState('all');
   const [conferences, setConferences] = useState([]);
   const [rankingScope, setRankingScope] = useState('national');
   const [conferenceGamesOnly, setConferenceGamesOnly] = useState(false);
   const [regularSeasonOnly, setRegularSeasonOnly] = useState(true);
-  const [selectedSeason, setSelectedSeason] = useState('2024');
   const [selectedClassification, setSelectedClassification] = useState('fbs');
   const [availableSeasons] = useState(['2024', '2025']);
   const [showExplanation, setShowExplanation] = useState(false);
+
+  // Update activeTab when season changes
+  useEffect(() => {
+    setActiveTab(selectedSeason === '2025' ? 'remaining' : 'overall');
+  }, [selectedSeason]);
 
   // Helper function to get the correct column suffix based on filters
   const getColumnSuffix = () => {
@@ -109,7 +117,7 @@ const SOSLeaderboard = () => {
     } else if (regularSeasonOnly) {
       return '_regular';
     }
-    return ''; // Default columns
+    return ''; // Default columns (all games)
   };
 
   // Helper function to get values based on active tab and filters
@@ -148,17 +156,10 @@ const SOSLeaderboard = () => {
         url.searchParams.append('classification', selectedClassification);
       }
       
-      // Add filter parameters
-      if (conferenceGamesOnly) {
-        url.searchParams.append('conferenceOnly', 'true');
-      }
-      
-      url.searchParams.append('regularSeasonOnly', regularSeasonOnly.toString());
-      
       console.log('🔍 Fetching SOS data:', url.toString());
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced timeout since it's pre-calculated
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       const response = await fetch(url.toString(), {
         signal: controller.signal,
@@ -196,14 +197,7 @@ const SOSLeaderboard = () => {
           });
         });
         
-        // Apply frontend filters based on checkboxes
-        if (conferenceGamesOnly || !regularSeasonOnly) {
-          // Show filter warning since we can't perfectly filter pre-calculated data
-          // but keep all teams for now
-          teams = teams.filter(() => true);
-        }
-        
-        // Enhance teams with power rating data and fix Top 40 formatting
+        // Enhance teams with power rating data
         const enhancedTeams = teams.map(team => {
           const powerData = powerRatingMap.get(team.team_name);
           
@@ -211,11 +205,7 @@ const SOSLeaderboard = () => {
             ...team,
             team: team.team_name, // Standardize field name
             power_rating: powerData?.rating || 0,
-            power_rating_rank: powerData?.rank || 999,
-            win_difference: parseFloat(team.actual_wins || 0) - parseFloat(team.projected_wins || 0),
-            top40_record: `${team.top40_wins || 0}-${(team.top40_games || 0) - (team.top40_wins || 0)}`,
-            // Fix expected wins showing as 0 - use projected_wins from table
-            projected_wins: team.projected_wins || '0.0'
+            power_rating_rank: powerData?.rank || 999
           };
         });
         
@@ -245,7 +235,7 @@ const SOSLeaderboard = () => {
 
   useEffect(() => {
     fetchSOSData();
-  }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification]); // Re-added filter dependencies
+  }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -559,7 +549,7 @@ const SOSLeaderboard = () => {
         </div>
       </div>
 
-      {/* Checkbox Options - Re-enabled */}
+      {/* Checkbox Options */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
@@ -624,7 +614,7 @@ const SOSLeaderboard = () => {
       {/* Desktop Table */}
       <div style={{ 
         overflowX: 'auto',
-        maxWidth: '1000px', // Centered and narrower
+        maxWidth: '1000px',
         margin: '0 auto'
       }}>
         <table style={{
@@ -668,7 +658,7 @@ const SOSLeaderboard = () => {
                   cursor: 'pointer',
                   userSelect: 'none',
                   minWidth: '60px',
-                  width: '80px' // Reduced width
+                  width: '80px'
                 }}
                 onClick={() => handleSort(
                   activeTab === 'overall' ? 'sos_overall' : 
@@ -697,20 +687,20 @@ const SOSLeaderboard = () => {
                   padding: '8px 4px', 
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
-                  borderLeft: '3px solid #007bff', // Changed to blue
-                  backgroundColor: '#e3f2fd', // Light blue background
+                  borderLeft: '3px solid #007bff',
+                  backgroundColor: '#e3f2fd',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
                   userSelect: 'none',
-                  width: '70px' // Reduced width for mobile
+                  width: '70px'
                 }}
-                onClick={() => handleSort('actual_wins')}
+                onClick={() => handleSort(activeTab === 'remaining' ? 'games_remaining' : 'actual_wins')}
               >
-                RECORD
-                <span className="sort-arrow-desktop">{getSortArrow('actual_wins')}</span>
+                {activeTab === 'remaining' ? 'GAMES' : 'RECORD'}
+                <span className="sort-arrow-desktop">{getSortArrow(activeTab === 'remaining' ? 'games_remaining' : 'actual_wins')}</span>
               </th>
               
               <th 
@@ -718,14 +708,14 @@ const SOSLeaderboard = () => {
                   padding: '8px 4px', 
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
-                  backgroundColor: '#e3f2fd', // Light blue background
+                  backgroundColor: '#e3f2fd',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
                   userSelect: 'none',
-                  width: '70px' // Reduced width for mobile
+                  width: '70px'
                 }}
                 onClick={() => handleSort('projected_wins')}
               >
@@ -734,26 +724,28 @@ const SOSLeaderboard = () => {
                 <span className="sort-arrow-desktop">{getSortArrow('projected_wins')}</span>
               </th>
               
-              <th 
-                style={{ 
-                  padding: '8px 4px', 
-                  textAlign: 'center', 
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  minWidth: '80px',
-                  display: activeTab === 'remaining' ? 'none' : 'table-cell' // Hide on remaining tab
-                }}
-                onClick={() => handleSort('win_difference')}
-              >
-                <span className="act-vs-exp-desktop">ACT VS EXP</span>
-                <span className="act-vs-exp-mobile" style={{ display: 'none' }}>ACT VS<br/>EXP</span>
-                <span className="sort-arrow-desktop">{getSortArrow('win_difference')}</span>
-              </th>
+              {/* ACT VS EXP column - only show when NOT on remaining tab */}
+              {activeTab !== 'remaining' && (
+                <th 
+                  style={{ 
+                    padding: '8px 4px', 
+                    textAlign: 'center', 
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    minWidth: '80px'
+                  }}
+                  onClick={() => handleSort('win_difference')}
+                >
+                  <span className="act-vs-exp-desktop">ACT VS EXP</span>
+                  <span className="act-vs-exp-mobile" style={{ display: 'none' }}>ACT VS<br/>EXP</span>
+                  <span className="sort-arrow-desktop">{getSortArrow('win_difference')}</span>
+                </th>
+              )}
               
               <th 
                 style={{ 
@@ -853,7 +845,7 @@ const SOSLeaderboard = () => {
                           {team.abbreviation || team.team}
                         </span>
                       </Link>
-                      {/* Rating Badge with correct rank */}
+                      {/* Rating Badge */}
                       {(() => {
                         const colors = getRankColor(powerRank, totalTeams, true);
                         return (
@@ -893,49 +885,50 @@ const SOSLeaderboard = () => {
                     showRank={true}
                   />
                   
-                  {/* Record */}
+                  {/* Record/Games Column */}
                   <td style={{ 
                     padding: '8px 4px', 
                     border: '1px solid #dee2e6',
-                    borderLeft: '3px solid #007bff', // Changed to blue
-                    backgroundColor: '#e3f2fd', // Light blue background
+                    borderLeft: '3px solid #007bff',
+                    backgroundColor: '#e3f2fd',
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
                     fontSize: '14px',
-                    width: '70px' // Reduced width
+                    width: '70px'
                   }}>
-                    {activeTab === 'remaining' ? '0-0' : 
-                     `${getTabValue(team, 'actual_wins')}-${getTabValue(team, 'actual_losses')}`}
+                    {activeTab === 'remaining' ? 
+                      getTabValue(team, 'games_remaining') : 
+                      `${getTabValue(team, 'actual_wins')}-${getTabValue(team, 'actual_losses')}`}
                   </td>
                   
                   {/* Expected Wins */}
                   <td style={{
                     padding: '8px 4px',
                     border: '1px solid #dee2e6',
-                    backgroundColor: '#e3f2fd', // Light blue background
+                    backgroundColor: '#e3f2fd',
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
                     fontSize: '14px',
-                    width: '70px' // Reduced width
+                    width: '70px'
                   }}>
                     {getTabValue(team, 'projected_wins').toFixed(1)}
                   </td>
                   
-                  {/* Win Difference - Now uses 20-color percentile system */}
-                  {(() => {
+                  {/* Win Difference - Only show when NOT on remaining tab */}
+                  {activeTab !== 'remaining' && (() => {
                     const diff = getTabValue(team, 'win_difference');
                     const diffRank = getSortedAndFilteredData()
                       .sort((a, b) => getTabValue(b, 'win_difference') - getTabValue(a, 'win_difference'))
                       .findIndex(t => t.team === team.team) + 1;
-                    const diffColors = getRankColor(diffRank, totalTeams, true); // Higher difference = better = green
+                    const diffColors = getRankColor(diffRank, totalTeams, true);
                     
                     return (
                       <td style={{
                         padding: '8px 4px',
                         border: '1px solid #dee2e6',
-                        borderRight: '3px solid #007bff', // Changed to blue
+                        borderRight: '3px solid #007bff',
                         backgroundColor: diffColors.bg,
                         color: diffColors.text,
                         fontFamily: 'Consolas, monospace',
@@ -967,7 +960,7 @@ const SOSLeaderboard = () => {
                     );
                   })()}
                   
-                  {/* Top 40 Record */}
+                  {/* Top 40 Record/Games */}
                   <td style={{ 
                     padding: '8px 4px', 
                     border: '1px solid #dee2e6',
@@ -978,10 +971,16 @@ const SOSLeaderboard = () => {
                     whiteSpace: 'nowrap'
                   }}>
                     {(() => {
-                      const wins = getTabValue(team, 'top40_wins');
-                      const games = getTabValue(team, 'top40_games');
-                      const losses = games - wins;
-                      return `${wins}-${losses}`;
+                      if (activeTab === 'remaining') {
+                        // Show just the number of games for remaining tab
+                        return getTabValue(team, 'top40_games');
+                      } else {
+                        // Show record for overall/played tabs
+                        const wins = getTabValue(team, 'top40_wins');
+                        const games = getTabValue(team, 'top40_games');
+                        const losses = games - wins;
+                        return `${wins}-${losses}`;
+                      }
                     })()}
                   </td>
                   
@@ -1093,7 +1092,6 @@ const SOSLeaderboard = () => {
           .sos-header-mobile {
             display: inline !important;
           }
-          /* Mobile header text changes */
           .exp-wins-desktop {
             display: none !important;
           }
@@ -1109,13 +1107,11 @@ const SOSLeaderboard = () => {
           table {
             min-width: 600px;
           }
-          /* Mobile font size reductions for record columns */
-          td:nth-child(3), /* Record */
-          td:nth-child(4), /* Expected Wins */
-          td:nth-child(5) { /* Act vs Exp */
+          td:nth-child(3),
+          td:nth-child(4),
+          td:nth-child(5) {
             font-size: 11px !important;
           }
-          /* Show emojis on mobile for difficulty */
           .difficulty-emojis-mobile {
             display: inline !important;
           }

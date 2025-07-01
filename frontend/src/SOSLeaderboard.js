@@ -125,7 +125,9 @@ const SOSLeaderboard = () => {
       fieldName = `${baseFieldName.replace('overall', 'played')}${suffix}`;
     }
     
-    return team[fieldName] || 0;
+    const value = team[fieldName];
+    // Always return a number, defaulting to 0 if value is null/undefined/NaN
+    return (value !== null && value !== undefined && !isNaN(parseFloat(value))) ? parseFloat(value) : 0;
   };
 
   const fetchSOSData = async () => {
@@ -868,7 +870,7 @@ const SOSLeaderboard = () => {
                   
                   {/* SOS Column */}
                   <StatCell 
-                    value={parseFloat(getTabValue(team, 'sos_overall')) || 0}
+                    value={getTabValue(team, 'sos_overall')}
                     rank={selectedConference === 'all' ? rank : 
                           (rankingScope === 'national' ? rank : 
                           getSortedAndFilteredData()
@@ -892,7 +894,7 @@ const SOSLeaderboard = () => {
                     width: '80px'
                   }}>
                     {activeTab === 'remaining' ? '0-0' : 
-                     `${getTabValue(team, 'actual_wins') || 0}-${getTabValue(team, 'actual_losses') || 0}`}
+                     `${getTabValue(team, 'actual_wins')}-${getTabValue(team, 'actual_losses')}`}
                   </td>
                   
                   {/* Expected Wins */}
@@ -906,7 +908,7 @@ const SOSLeaderboard = () => {
                     fontSize: '14px',
                     width: '80px'
                   }}>
-                    {parseFloat(getTabValue(team, 'projected_wins') || 0).toFixed(1)}
+                    {getTabValue(team, 'projected_wins').toFixed(1)}
                   </td>
                   
                   {/* Win Difference */}
@@ -916,7 +918,7 @@ const SOSLeaderboard = () => {
                     borderRight: '3px solid #28a745',
                     backgroundColor: (() => {
                       if (activeTab === 'remaining') return '#f8fff8';
-                      const diff = getTabValue(team, 'win_difference') || 0;
+                      const diff = getTabValue(team, 'win_difference');
                       if (diff > 1) return '#d4edda';
                       if (diff < -1) return '#f8d7da';
                       return '#f8fff8';
@@ -928,14 +930,14 @@ const SOSLeaderboard = () => {
                     width: '90px',
                     color: (() => {
                       if (activeTab === 'remaining') return '#212529';
-                      const diff = getTabValue(team, 'win_difference') || 0;
+                      const diff = getTabValue(team, 'win_difference');
                       if (diff > 1) return '#155724';
                       if (diff < -1) return '#721c24';
                       return '#212529';
                     })()
                   }}>
                     {(() => {
-                      const diff = getTabValue(team, 'win_difference') || 0;
+                      const diff = getTabValue(team, 'win_difference');
                       return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
                     })()}
                   </td>
@@ -951,8 +953,8 @@ const SOSLeaderboard = () => {
                     whiteSpace: 'nowrap'
                   }}>
                     {(() => {
-                      const wins = getTabValue(team, 'top40_wins') || 0;
-                      const games = getTabValue(team, 'top40_games') || 0;
+                      const wins = getTabValue(team, 'top40_wins');
+                      const games = getTabValue(team, 'top40_games');
                       const losses = games - wins;
                       return `${wins}-${losses}`;
                     })()}
@@ -983,7 +985,7 @@ const SOSLeaderboard = () => {
                         color: '#007bff'
                       }}>
                         <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop">🪙</span>
-                        <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'coinflip_games') || 0}</span>
+                        <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'coinflip_games')}</span>
                       </div>
                       
                       <div style={{ 
@@ -993,7 +995,7 @@ const SOSLeaderboard = () => {
                         color: '#28a745'
                       }}>
                         <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop">🔒</span>
-                        <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'sure_thing_games') || 0}</span>
+                        <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'sure_thing_games')}</span>
                       </div>
                       
                       <div style={{ 
@@ -1003,7 +1005,7 @@ const SOSLeaderboard = () => {
                         color: '#dc3545'
                       }}>
                         <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop">🎯</span>
-                        <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'longshot_games') || 0}</span>
+                        <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'longshot_games')}</span>
                       </div>
                     </div>
                   </td>

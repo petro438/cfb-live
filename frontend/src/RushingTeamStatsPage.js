@@ -196,25 +196,14 @@ const RushingStatsPage = () => {
       // Sort values - SPECIAL HANDLING FOR DEFENSE
       let sortedValues;
       if (offenseDefense === 'defense') {
-        if (stat === 'yards_per_rush' || stat === 'rushing_yards' || stat === 'rushing_attempts' || stat === 'rushing_tds' || 
-            stat === 'rushing_yards_per_game' || stat === 'rushing_attempts_per_game' || stat === 'rushing_tds_per_game' || 
-            stat === 'rushing_rate_display') {
-          // Defense: LOWER is BETTER for all these stats
-          sortedValues = rankingUniverse
-            .map(team => {
-              const value = parseFloat(team[stat]);
-              return isNaN(value) ? 999 : value; // Put invalid values at end (worst)
-            })
-            .sort((a, b) => a - b); // Ascending: lowest values first (best defense)
-        } else {
-          // Any other defense stats (if they exist)
-          sortedValues = rankingUniverse
-            .map(team => {
-              const value = parseFloat(team[stat]);
-              return isNaN(value) ? 0 : value;
-            })
-            .sort((a, b) => b - a);
-        }
+        // Defense: LOWER is BETTER for ALL rushing stats
+        // (Less rushing allowed = better defense)
+        sortedValues = rankingUniverse
+          .map(team => {
+            const value = parseFloat(team[stat]);
+            return isNaN(value) ? 999 : value; // Put invalid values at end (worst)
+          })
+          .sort((a, b) => a - b); // Ascending: lowest values first (best defense)
       } else {
         // Offense: higher is better for all stats
         sortedValues = rankingUniverse

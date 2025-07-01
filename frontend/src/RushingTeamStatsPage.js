@@ -24,6 +24,12 @@ const RushingStatsPage = () => {
   const [sortConfig, setSortConfig] = useState({ key: 'rushing_rate', direction: 'desc' });
   const [conferenceRankingMode, setConferenceRankingMode] = useState('national'); // 'national' or 'conference'
 
+  // Force recalculation when conference ranking mode changes
+  useEffect(() => {
+    console.log(`🔄 Conference ranking mode changed to: ${conferenceRankingMode}`);
+    // This will trigger the useMemo recalculation
+  }, [conferenceRankingMode]);
+
   // Reset conference ranking mode when switching to 'all' conferences
   useEffect(() => {
     if (selectedConference === 'all') {
@@ -189,14 +195,26 @@ const RushingStatsPage = () => {
       
       // Sort values - SPECIAL HANDLING FOR DEFENSE
       let sortedValues;
-      if (offenseDefense === 'defense' && stat === 'yards_per_rush') {
-        // Defense: lower yards per rush is better
-        sortedValues = rankingUniverse
-          .map(team => {
-            const value = parseFloat(team[stat]);
-            return isNaN(value) ? 999 : value; // Put invalid values at end
-          })
-          .sort((a, b) => a - b); // Ascending for defense
+      if (offenseDefense === 'defense') {
+        if (stat === 'yards_per_rush' || stat === 'rushing_yards' || stat === 'rushing_attempts' || stat === 'rushing_tds' || 
+            stat === 'rushing_yards_per_game' || stat === 'rushing_attempts_per_game' || stat === 'rushing_tds_per_game' || 
+            stat === 'rushing_rate_display') {
+          // Defense: LOWER is BETTER for all these stats
+          sortedValues = rankingUniverse
+            .map(team => {
+              const value = parseFloat(team[stat]);
+              return isNaN(value) ? 999 : value; // Put invalid values at end (worst)
+            })
+            .sort((a, b) => a - b); // Ascending: lowest values first (best defense)
+        } else {
+          // Any other defense stats (if they exist)
+          sortedValues = rankingUniverse
+            .map(team => {
+              const value = parseFloat(team[stat]);
+              return isNaN(value) ? 0 : value;
+            })
+            .sort((a, b) => b - a);
+        }
       } else {
         // Offense: higher is better for all stats
         sortedValues = rankingUniverse
@@ -211,10 +229,27 @@ const RushingStatsPage = () => {
         
       rankedTeams.forEach((team, teamIndex) => {
         const value = parseFloat(team[stat]);
-        const cleanValue = isNaN(value) ? (offenseDefense === 'defense' && stat === 'yards_per_rush' ? 999 : 0) : value;
+        const cleanValue = isNaN(value) ? (offenseDefense === 'defense' ? 999 : 0) : value;
         
-        // Find rank within the appropriate universe
-        const rank = sortedValues.indexOf(cleanValue) + 1;
+        // Find rank within the appropriate universe - MORE ROBUST METHOD
+        let rank = 1;
+        if (offenseDefense === 'defense') {
+          // Count how many teams in universe have LOWER values (better defense)
+          rank = rankingUniverse.filter(t => {
+            const tValue = parseFloat(t[stat]);
+            const tCleanValue = isNaN(tValue) ? 999 : tValue;
+            return tCleanValue < cleanValue;
+          }).length + 1;
+        } else {
+          // Count how many teams in universe have HIGHER values (better offense)
+          rank = rankingUniverse.filter(t => {
+            const tValue = parseFloat(t[stat]);
+            const tCleanValue = isNaN(tValue) ? 0 : tValue;
+            return tCleanValue > cleanValue;
+          }).length + 1;
+        }
+        
+        // Calculate percentile (same for both offense and defense)
         const percentile = ((rankingUniverse.length - rank + 1) / rankingUniverse.length) * 100;
         
         team[`${stat}_rank`] = rank;

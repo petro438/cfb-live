@@ -156,13 +156,12 @@ const SOSLeaderboard = () => {
           });
         });
         
-        // Apply frontend filters if needed (since backend doesn't handle these yet)
-        teams = teams.filter(team => {
-          // Apply conference/regular season filters on frontend for now
-          // Note: This is imperfect since we're filtering already-calculated data
-          // but it's better than trying to recalculate everything
-          return true; // Keep all teams, show filter status in UI
-        });
+        // Apply frontend filters based on checkboxes
+        if (conferenceGamesOnly || !regularSeasonOnly) {
+          // Show filter warning since we can't perfectly filter pre-calculated data
+          // but keep all teams for now
+          teams = teams.filter(() => true);
+        }
         
         // Enhance teams with power rating data and fix Top 40 formatting
         const enhancedTeams = teams.map(team => {
@@ -174,7 +173,9 @@ const SOSLeaderboard = () => {
             power_rating: powerData?.rating || 0,
             power_rating_rank: powerData?.rank || 999,
             win_difference: parseFloat(team.actual_wins || 0) - parseFloat(team.projected_wins || 0),
-            top40_record: `${team.top40_wins || 0}-${(team.top40_games || 0) - (team.top40_wins || 0)}`
+            top40_record: `${team.top40_wins || 0}-${(team.top40_games || 0) - (team.top40_wins || 0)}`,
+            // Fix expected wins showing as 0 - use projected_wins from table
+            projected_wins: team.projected_wins || '0.0'
           };
         });
         
@@ -204,7 +205,7 @@ const SOSLeaderboard = () => {
 
   useEffect(() => {
     fetchSOSData();
-  }, [selectedSeason, selectedClassification]); // Removed filter dependencies since we're using pre-calculated data
+  }, [conferenceGamesOnly, regularSeasonOnly, selectedSeason, selectedClassification]); // Re-added filter dependencies
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -336,16 +337,17 @@ const SOSLeaderboard = () => {
         <button
           onClick={() => setShowExplanation(!showExplanation)}
           style={{
-            padding: '8px 16px',
-            border: '1px solid #007bff',
-            borderRadius: '4px',
-            backgroundColor: showExplanation ? '#007bff' : '#ffffff',
-            color: showExplanation ? '#ffffff' : '#007bff',
+            padding: '10px 20px',
+            border: '2px solid #28a745',
+            borderRadius: '8px',
+            backgroundColor: showExplanation ? '#28a745' : '#ffffff',
+            color: showExplanation ? '#ffffff' : '#28a745',
             fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '14px',
+            fontSize: '15px',
             fontWeight: 'bold',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.3s ease',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
         >
           {showExplanation ? 'Hide' : 'Explanation of These Stats'} {showExplanation ? '▲' : '▼'}
@@ -517,7 +519,7 @@ const SOSLeaderboard = () => {
         </div>
       </div>
 
-      {/* Checkbox Options */}
+      {/* Checkbox Options - Re-enabled */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
@@ -527,24 +529,63 @@ const SOSLeaderboard = () => {
         gap: '16px',
         flexWrap: 'wrap'
       }}>
-        <div style={{
+        <label style={{
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          color: '#212529',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
-          padding: '8px 16px',
-          backgroundColor: '#fff3cd',
-          border: '1px solid #ffeaa7',
-          borderRadius: '4px',
-          fontSize: '12px',
-          color: '#856404'
+          gap: '8px',
+          cursor: 'pointer'
         }}>
-          <span>⚠️ Note: Filters coming soon - currently showing all regular season games</span>
-        </div>
+          <input
+            type="checkbox"
+            checked={conferenceGamesOnly}
+            onChange={(e) => setConferenceGamesOnly(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          CONFERENCE GAMES ONLY
+        </label>
+
+        <label style={{
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          color: '#212529',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer'
+        }}>
+          <input
+            type="checkbox"
+            checked={regularSeasonOnly}
+            onChange={(e) => setRegularSeasonOnly(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          REGULAR SEASON ONLY
+        </label>
+        
+        {(conferenceGamesOnly || !regularSeasonOnly) && (
+          <div style={{
+            padding: '4px 8px',
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '4px',
+            fontSize: '11px',
+            color: '#856404'
+          }}>
+            ⚠️ Note: Filters affect future calculations
+          </div>
+        )}
       </div>
 
       {/* Desktop Table */}
       <div style={{ 
-        overflowX: 'auto'
+        overflowX: 'auto',
+        maxWidth: '1000px', // Centered and narrower
+        margin: '0 auto'
       }}>
         <table style={{
           width: '100%',
@@ -794,7 +835,7 @@ const SOSLeaderboard = () => {
                   <StatCell 
                     value={
                       activeTab === 'overall' ? (team.sos_overall ? parseFloat(team.sos_overall) : 0) :
-                      activeTab === 'remaining' ? (team.sos_remaining ? parseFloat(team.sos_remaining) : 0) :
+                      activeTab === 'remaining' ? 0 : // Always 0 since all games are played
                       (team.sos_played && team.sos_played !== '0.000' ? parseFloat(team.sos_played) : 0)
                     }
                     rank={selectedConference === 'all' ? rank : 
@@ -816,7 +857,8 @@ const SOSLeaderboard = () => {
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    width: '80px' // Reduced from default
                   }}>
                     {team.actual_wins || 0}-{team.actual_losses || 0}
                   </td>
@@ -829,7 +871,8 @@ const SOSLeaderboard = () => {
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    width: '80px' // Reduced from default
                   }}>
                     {team.projected_wins ? parseFloat(team.projected_wins).toFixed(1) : '0.0'}
                   </td>
@@ -849,6 +892,7 @@ const SOSLeaderboard = () => {
                     textAlign: 'center',
                     fontWeight: 'bold',
                     fontSize: '14px',
+                    width: '90px', // Reduced from default
                     color: (() => {
                       const diff = team.win_difference;
                       if (diff > 1) return '#155724';
@@ -982,6 +1026,12 @@ const SOSLeaderboard = () => {
           }
           table {
             min-width: 600px;
+          }
+          /* Mobile font size reductions for record columns */
+          td:nth-child(3), /* Record */
+          td:nth-child(4), /* Expected Wins */
+          td:nth-child(5) { /* Act vs Exp */
+            font-size: 11px !important;
           }
         }
         @media (min-width: 769px) {

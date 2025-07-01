@@ -221,7 +221,7 @@ const PassingStatsPage = () => {
           padding: isMobile ? '4px 2px' : '8px 16px',
           border: '1px solid #dee2e6',
           fontFamily: 'Consolas, monospace',
-          fontSize: isMobile ? '11px' : '13px',
+          fontSize: isMobile ? (statKey === 'games_played' ? '9px' : '11px') : '13px',
           textAlign: 'center',
           backgroundColor: '#ffffff',
           width: isMobile ? 'auto' : 'auto'
@@ -241,7 +241,7 @@ const PassingStatsPage = () => {
         padding: isMobile ? '4px 2px' : '8px 16px',
         border: '1px solid #dee2e6',
         fontFamily: 'Consolas, monospace',
-        fontSize: isMobile ? '11px' : '13px',
+        fontSize: isMobile ? (statKey === 'games_played' ? '9px' : '11px') : '13px',
         textAlign: 'center',
         minWidth: isMobile ? '35px' : '80px',
         width: isMobile ? 'auto' : 'auto'
@@ -300,7 +300,12 @@ const PassingStatsPage = () => {
       padding: '8px'
     }}>
       {/* Header */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ 
+        marginBottom: '16px',
+        display: 'flex',
+        justifyContent: 'center',
+        textAlign: 'center'
+      }}>
         <h1 style={{ 
           fontFamily: 'Trebuchet MS, sans-serif',
           fontWeight: 'bold',
@@ -550,7 +555,8 @@ const PassingStatsPage = () => {
         marginBottom: '16px', 
         fontSize: '12px', 
         color: '#6c757d',
-        fontFamily: 'Trebuchet MS, sans-serif'
+        fontFamily: 'Trebuchet MS, sans-serif',
+        textAlign: 'center'
       }}>
         Showing {sortedTeams.length} teams • {statType === 'total' ? 'Season Totals' : 'Per Game Averages'}
       </div>
@@ -844,113 +850,149 @@ const PassingStatsPage = () => {
           }}>
             <thead>
               <tr style={{ backgroundColor: '#f8f9fa' }}>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'left',
-                  width: '22%'
-                }}>
-                  TEAM
+                <th 
+                  onClick={() => handleSort('team')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'left',
+                    width: '22%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  TEAM{getSortIcon('team')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '8%'
-                }}>
-                  GP
+                <th 
+                  onClick={() => handleSort('games_played')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '8%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  GP{getSortIcon('games_played')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '9%'
-                }}>
-                  CMP
+                <th 
+                  onClick={() => handleSort('completions')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '9%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  CMP{getSortIcon('completions')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '9%'
-                }}>
-                  ATT
+                <th 
+                  onClick={() => handleSort('attempts')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '9%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ATT{getSortIcon('attempts')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '10%'
-                }}>
-                  YDS
+                <th 
+                  onClick={() => handleSort('passing_yards')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '10%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  YDS{getSortIcon('passing_yards')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '9%'
-                }}>
-                  Y/A
+                <th 
+                  onClick={() => handleSort('yards_per_attempt')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '9%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Y/A{getSortIcon('yards_per_attempt')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '8%'
-                }}>
-                  TD
+                <th 
+                  onClick={() => handleSort('passing_touchdowns')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '8%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  TD{getSortIcon('passing_touchdowns')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '8%'
-                }}>
-                  INT
+                <th 
+                  onClick={() => handleSort('interceptions')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '8%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  INT{getSortIcon('interceptions')}
                 </th>
-                <th style={{
-                  padding: '4px 2px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                  width: '7%'
-                }}>
-                  SCK
+                <th 
+                  onClick={() => handleSort('sacks_allowed')}
+                  style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    width: '7%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  SCK{getSortIcon('sacks_allowed')}
                 </th>
               </tr>
             </thead>

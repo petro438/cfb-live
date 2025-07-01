@@ -536,7 +536,7 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
-// Replace the passing stats endpoint in server.js with this version using correct column names
+// Replace the passing stats endpoint in server.js with this deduplicated version
 
 app.get('/api/leaderboards/passing/:season', async (req, res) => {
   try {
@@ -550,103 +550,187 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     } = req.query;
     
     console.log(`🏈 Fetching passing stats: ${view_type} ${stat_type} for ${season}`);
-    console.log(`📊 Filters: season_type=${season_type}, conference_only=${conference_only}, conference=${conference}`);
     
-    // STEP 1: Check if game_team_stats_new table has data
-    const tableCheck = await pool.query(`
-      SELECT COUNT(*) as count
-      FROM game_team_stats_new 
-      WHERE completions IS NOT NULL
-    `);
-    
-    console.log('📋 Table check:', tableCheck.rows[0]);
-    
-    if (parseInt(tableCheck.rows[0].count) === 0) {
-      return res.status(404).json({
-        error: 'No passing data found in game_team_stats_new table'
-      });
-    }
-    
-    // STEP 2: Get all games for the season with filters
-    let gameQuery = `
-      SELECT id, home_team, away_team, season_type, conference_game
-      FROM games 
-      WHERE season = $1 AND completed = true
+    // STEP 1: Build the base query with proper filters
+    let baseQuery = `
+      SELECT DISTINCT
+        gts.team,
+        gts.game_id,
+        g.season_type,
+        g.conference_game,
+        gts.completions,
+        gts.passing_attempts,
+        gts.net_passing_yards,
+        gts.passing_tds,
+        gts.interceptions_thrown,
+        gts.sacks
+      FROM game_team_stats_new gts
+      JOIN games g ON gts.game_id = g.id
+      WHERE g.season = $1 
+        AND g.completed = true
     `;
     
-    const gameParams = [season];
+    const queryParams = [season];
     
+    // Add season type filter
     if (season_type === 'regular') {
-      gameQuery += ` AND season_type = 'regular'`;
+      baseQuery += ` AND g.season_type = 'regular'`;
     }
     
+    // Add conference games filter
     if (conference_only === 'true') {
-      gameQuery += ` AND conference_game = true`;
+      baseQuery += ` AND g.conference_game = true`;
     }
     
-    const gamesResult = await pool.query(gameQuery, gameParams);
-    const gameIds = gamesResult.rows.map(g => g.id);
+    baseQuery += ` ORDER BY gts.team, gts.game_id`;
     
-    console.log(`📊 Found ${gameIds.length} games for ${season}`);
+    console.log('🔍 Base query:', baseQuery);
     
-    if (gameIds.length === 0) {
+    const allStatsResult = await pool.query(baseQuery, queryParams);
+    const allStats = allStatsResult.rows;
+    
+    console.log(`📊 Found ${allStats.length} individual game records`);
+    
+    if (allStats.length === 0) {
       return res.json({
         teams: [],
-        metadata: { season: parseInt(season), message: 'No games found' }
+        metadata: { season: parseInt(season), message: 'No game data found' }
       });
     }
     
-    // STEP 3: Get team stats using correct column names
-    let statsQuery;
+    // STEP 2: Process data differently for offense vs defense
+    let teamStatsMap = {};
     
     if (view_type === 'offense') {
-      // OFFENSE: Get team's own stats
-      statsQuery = `
-        SELECT 
-          gts.team,
-          COUNT(DISTINCT gts.game_id) as games_played,
-          SUM(COALESCE(gts.completions, 0)) as completions,
-          SUM(COALESCE(gts.passing_attempts, 0)) as attempts,
-          SUM(COALESCE(gts.net_passing_yards, 0)) as net_passing_yards,
-          SUM(COALESCE(gts.passing_tds, 0)) as passing_touchdowns,
-          SUM(COALESCE(gts.interceptions_thrown, 0)) as interceptions,
-          -- For offense, get sacks from opponent stats (sacks they recorded against us)
-          COALESCE(SUM(opp.sacks), 0) as sacks_allowed
-        FROM game_team_stats_new gts
-        LEFT JOIN game_team_stats_new opp ON gts.game_id = opp.game_id AND opp.team != gts.team
-        WHERE gts.game_id = ANY($1)
-        GROUP BY gts.team
-        HAVING COUNT(DISTINCT gts.game_id) > 0
-        ORDER BY gts.team
+      // OFFENSE: Aggregate each team's own stats
+      allStats.forEach(stat => {
+        if (!teamStatsMap[stat.team]) {
+          teamStatsMap[stat.team] = {
+            team: stat.team,
+            games_played: 0,
+            completions: 0,
+            attempts: 0,
+            net_passing_yards: 0,
+            passing_touchdowns: 0,
+            interceptions: 0,
+            sacks_allowed: 0,
+            game_ids: new Set()
+          };
+        }
+        
+        // Only count each game once per team
+        if (!teamStatsMap[stat.team].game_ids.has(stat.game_id)) {
+          teamStatsMap[stat.team].game_ids.add(stat.game_id);
+          teamStatsMap[stat.team].games_played++;
+          teamStatsMap[stat.team].completions += parseInt(stat.completions) || 0;
+          teamStatsMap[stat.team].attempts += parseInt(stat.passing_attempts) || 0;
+          teamStatsMap[stat.team].net_passing_yards += parseInt(stat.net_passing_yards) || 0;
+          teamStatsMap[stat.team].passing_touchdowns += parseInt(stat.passing_tds) || 0;
+          teamStatsMap[stat.team].interceptions += parseInt(stat.interceptions_thrown) || 0;
+        }
+      });
+      
+      // For offense sacks, we need to get opponent sacks against us
+      const sackQuery = `
+        SELECT DISTINCT
+          opp_gts.team as opponent_team,
+          our_gts.team as our_team,
+          our_gts.game_id,
+          opp_gts.sacks
+        FROM game_team_stats_new our_gts
+        JOIN game_team_stats_new opp_gts ON our_gts.game_id = opp_gts.game_id 
+          AND opp_gts.team != our_gts.team
+        JOIN games g ON our_gts.game_id = g.id
+        WHERE g.season = $1 AND g.completed = true
+        ${season_type === 'regular' ? "AND g.season_type = 'regular'" : ''}
+        ${conference_only === 'true' ? "AND g.conference_game = true" : ''}
       `;
+      
+      const sackResult = await pool.query(sackQuery, queryParams);
+      
+      sackResult.rows.forEach(sackStat => {
+        if (teamStatsMap[sackStat.our_team] && 
+            teamStatsMap[sackStat.our_team].game_ids.has(sackStat.game_id)) {
+          teamStatsMap[sackStat.our_team].sacks_allowed += parseInt(sackStat.sacks) || 0;
+        }
+      });
+      
     } else {
       // DEFENSE: Get opponent stats (what we allowed)
-      statsQuery = `
-        SELECT 
-          gts.team,
-          COUNT(DISTINCT gts.game_id) as games_played,
-          SUM(COALESCE(opp.completions, 0)) as completions,
-          SUM(COALESCE(opp.passing_attempts, 0)) as attempts,
-          SUM(COALESCE(opp.net_passing_yards, 0)) as net_passing_yards,
-          SUM(COALESCE(opp.passing_tds, 0)) as passing_touchdowns,
-          SUM(COALESCE(opp.interceptions_thrown, 0)) as interceptions,
-          -- For defense, sacks are what we recorded
-          SUM(COALESCE(gts.sacks, 0)) as sacks_allowed
-        FROM game_team_stats_new gts
-        JOIN game_team_stats_new opp ON gts.game_id = opp.game_id AND opp.team != gts.team
-        WHERE gts.game_id = ANY($1)
-        GROUP BY gts.team
-        HAVING COUNT(DISTINCT gts.game_id) > 0
-        ORDER BY gts.team
-      `;
+      const gameTeamMap = {};
+      
+      // First, map which teams played in each game
+      allStats.forEach(stat => {
+        if (!gameTeamMap[stat.game_id]) {
+          gameTeamMap[stat.game_id] = [];
+        }
+        gameTeamMap[stat.game_id].push(stat);
+      });
+      
+      // Now aggregate opponent stats for each team
+      Object.values(gameTeamMap).forEach(gameStats => {
+        if (gameStats.length === 2) { // Make sure we have both teams
+          const team1 = gameStats[0];
+          const team2 = gameStats[1];
+          
+          // Team 1's defense allowed Team 2's offense
+          if (!teamStatsMap[team1.team]) {
+            teamStatsMap[team1.team] = {
+              team: team1.team,
+              games_played: 0,
+              completions: 0,
+              attempts: 0,
+              net_passing_yards: 0,
+              passing_touchdowns: 0,
+              interceptions: 0,
+              sacks_allowed: 0,
+              game_ids: new Set()
+            };
+          }
+          
+          if (!teamStatsMap[team1.team].game_ids.has(team1.game_id)) {
+            teamStatsMap[team1.team].game_ids.add(team1.game_id);
+            teamStatsMap[team1.team].games_played++;
+            teamStatsMap[team1.team].completions += parseInt(team2.completions) || 0;
+            teamStatsMap[team1.team].attempts += parseInt(team2.passing_attempts) || 0;
+            teamStatsMap[team1.team].net_passing_yards += parseInt(team2.net_passing_yards) || 0;
+            teamStatsMap[team1.team].passing_touchdowns += parseInt(team2.passing_tds) || 0;
+            teamStatsMap[team1.team].interceptions += parseInt(team2.interceptions_thrown) || 0;
+            teamStatsMap[team1.team].sacks_allowed += parseInt(team1.sacks) || 0; // Our sacks
+          }
+          
+          // Team 2's defense allowed Team 1's offense
+          if (!teamStatsMap[team2.team]) {
+            teamStatsMap[team2.team] = {
+              team: team2.team,
+              games_played: 0,
+              completions: 0,
+              attempts: 0,
+              net_passing_yards: 0,
+              passing_touchdowns: 0,
+              interceptions: 0,
+              sacks_allowed: 0,
+              game_ids: new Set()
+            };
+          }
+          
+          if (!teamStatsMap[team2.team].game_ids.has(team2.game_id)) {
+            teamStatsMap[team2.team].game_ids.add(team2.game_id);
+            teamStatsMap[team2.team].games_played++;
+            teamStatsMap[team2.team].completions += parseInt(team1.completions) || 0;
+            teamStatsMap[team2.team].attempts += parseInt(team1.passing_attempts) || 0;
+            teamStatsMap[team2.team].net_passing_yards += parseInt(team1.net_passing_yards) || 0;
+            teamStatsMap[team2.team].passing_touchdowns += parseInt(team1.passing_tds) || 0;
+            teamStatsMap[team2.team].interceptions += parseInt(team1.interceptions_thrown) || 0;
+            teamStatsMap[team2.team].sacks_allowed += parseInt(team2.sacks) || 0; // Our sacks
+          }
+        }
+      });
     }
     
-    console.log('📈 Executing stats query...');
-    
-    const statsResult = await pool.query(statsQuery, [gameIds]);
-    const rawStats = statsResult.rows;
-    
-    console.log(`📊 Found stats for ${rawStats.length} teams`);
+    // STEP 3: Convert to array and get team info
+    const rawStats = Object.values(teamStatsMap);
+    console.log(`📊 Aggregated stats for ${rawStats.length} teams`);
     
     if (rawStats.length === 0) {
       return res.json({
@@ -671,18 +755,18 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     
     console.log(`🏫 Found info for ${teamInfoResult.rows.length} FBS teams`);
     
-    // STEP 5: Process stats and calculate derived metrics
+    // STEP 5: Process final stats
     const processedTeams = rawStats
       .filter(stat => teamInfoMap[stat.team]) // Only FBS teams
       .map(stat => {
         const teamInfo = teamInfoMap[stat.team];
-        const gamesPlayed = parseInt(stat.games_played) || 1;
+        const gamesPlayed = stat.games_played || 1;
         
         // Calculate derived stats
-        const attempts = parseInt(stat.attempts) || 0;
-        const completions = parseInt(stat.completions) || 0;
+        const attempts = stat.attempts || 0;
+        const completions = stat.completions || 0;
         const completion_percentage = attempts > 0 ? (completions / attempts) * 100 : 0;
-        const yards_per_attempt = attempts > 0 ? parseInt(stat.net_passing_yards) / attempts : 0;
+        const yards_per_attempt = attempts > 0 ? stat.net_passing_yards / attempts : 0;
         
         // For per-game stats, divide by games played
         const divisor = stat_type === 'per_game' ? gamesPlayed : 1;
@@ -697,11 +781,11 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
           completions: parseFloat((completions / divisor).toFixed(1)),
           attempts: parseFloat((attempts / divisor).toFixed(1)),
           completion_percentage: parseFloat(completion_percentage.toFixed(1)),
-          passing_yards: parseFloat((parseInt(stat.net_passing_yards) / divisor).toFixed(1)),
+          passing_yards: parseFloat((stat.net_passing_yards / divisor).toFixed(1)),
           yards_per_attempt: parseFloat(yards_per_attempt.toFixed(2)),
-          passing_touchdowns: parseFloat((parseInt(stat.passing_touchdowns) / divisor).toFixed(1)),
-          interceptions: parseFloat((parseInt(stat.interceptions) / divisor).toFixed(1)),
-          sacks_allowed: parseFloat((parseInt(stat.sacks_allowed) / divisor).toFixed(1))
+          passing_touchdowns: parseFloat((stat.passing_touchdowns / divisor).toFixed(1)),
+          interceptions: parseFloat((stat.interceptions / divisor).toFixed(1)),
+          sacks_allowed: parseFloat((stat.sacks_allowed / divisor).toFixed(1))
         };
       });
     
@@ -711,7 +795,7 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
       finalTeams = processedTeams.filter(team => team.conference === conference);
     }
     
-    console.log(`✅ Returning ${finalTeams.length} teams after all filters`);
+    console.log(`✅ Returning ${finalTeams.length} teams with realistic stats`);
     
     res.json({
       teams: finalTeams,
@@ -723,8 +807,6 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
         conference_only: conference_only === 'true',
         conference,
         total_teams: finalTeams.length,
-        raw_teams_found: rawStats.length,
-        fbs_teams_found: processedTeams.length,
         generated_at: new Date().toISOString()
       }
     });

@@ -118,6 +118,13 @@ const SOSLeaderboard = () => {
         url.searchParams.append('classification', selectedClassification);
       }
       
+      // Add filter parameters
+      if (conferenceGamesOnly) {
+        url.searchParams.append('conferenceOnly', 'true');
+      }
+      
+      url.searchParams.append('regularSeasonOnly', regularSeasonOnly.toString());
+      
       console.log('🔍 Fetching SOS data:', url.toString());
       
       const controller = new AbortController();

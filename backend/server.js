@@ -1355,22 +1355,57 @@ app.get('/api/debug-columns', async (req, res) => {
   }
 });
 
-// FAST SOS Endpoint - reads from pre-calculated table
-// Add this to your server.js file
+// FAST SOS Endpoint - reads from pre-calculated table with proper filtering
+// Add this to your server.js file (replace existing fast endpoint)
 app.get('/api/leaderboards/strength-of-schedule-fast/:season', async (req, res) => {
   try {
     const { season } = req.params;
-    const { classification = 'fbs', conference } = req.query;
+    const { 
+      classification = 'fbs', 
+      conference,
+      conferenceOnly = 'false',
+      regularSeasonOnly = 'true'
+    } = req.query;
     
     console.log(`🚀 Fast SOS fetch for ${season}`);
+    console.log(`📊 Filters: classification=${classification}, conference=${conference}, conferenceOnly=${conferenceOnly}, regularSeasonOnly=${regularSeasonOnly}`);
     const start = Date.now();
+    
+    // Determine which columns to use based on filters
+    let columnSuffix = '';
+    if (conferenceOnly === 'true' && regularSeasonOnly === 'true') {
+      columnSuffix = '_conf_reg';
+    } else if (conferenceOnly === 'true') {
+      columnSuffix = '_conference';  
+    } else if (regularSeasonOnly === 'true') {
+      columnSuffix = '_regular';
+    }
+    // If both false, use default columns (no suffix)
     
     let query = `
       SELECT 
         sos.*,
         t.logo_url,
         t.conference,
-        t.abbreviation
+        t.abbreviation,
+        
+        -- Dynamic column selection based on filters
+        sos.sos_overall${columnSuffix} as sos_overall,
+        sos.sos_played${columnSuffix} as sos_played, 
+        sos.sos_remaining${columnSuffix} as sos_remaining,
+        sos.sos_rank${columnSuffix} as sos_rank,
+        sos.actual_wins${columnSuffix} as actual_wins,
+        sos.actual_losses${columnSuffix} as actual_losses,
+        sos.projected_wins${columnSuffix} as projected_wins,
+        sos.win_difference${columnSuffix} as win_difference,
+        sos.top40_wins${columnSuffix} as top40_wins,
+        sos.top40_games${columnSuffix} as top40_games,
+        sos.coinflip_games${columnSuffix} as coinflip_games,
+        sos.sure_thing_games${columnSuffix} as sure_thing_games,
+        sos.longshot_games${columnSuffix} as longshot_games,
+        sos.games_played${columnSuffix} as games_played,
+        sos.games_remaining${columnSuffix} as games_remaining
+        
       FROM strength_of_schedule sos
       LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(sos.team_name))
       WHERE sos.season = $1 AND sos.classification = $2
@@ -1383,17 +1418,23 @@ app.get('/api/leaderboards/strength-of-schedule-fast/:season', async (req, res) 
       params.push(conference);
     }
     
-    query += ` ORDER BY sos.sos_rank`;
+    query += ` ORDER BY sos.sos_rank${columnSuffix}`;
     
     const result = await pool.query(query, params);
     
     console.log(`✅ Fast SOS: ${result.rows.length} teams in ${Date.now() - start}ms`);
+    console.log(`📋 Using column suffix: "${columnSuffix}" for filters`);
     
     res.json({
       teams: result.rows,
       metadata: {
         season: parseInt(season),
         total_teams: result.rows.length,
+        filters: {
+          conference_only: conferenceOnly === 'true',
+          regular_season_only: regularSeasonOnly === 'true',
+          column_suffix: columnSuffix
+        },
         last_calculated: result.rows[0]?.last_updated,
         calculation_time: `${Date.now() - start}ms (pre-calculated)`
       }
@@ -1404,7 +1445,6 @@ app.get('/api/leaderboards/strength-of-schedule-fast/:season', async (req, res) 
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
-
 // Also update your games endpoint to include result calculation
 // Find your existing /api/teams/:teamName/games endpoint and update it:
 

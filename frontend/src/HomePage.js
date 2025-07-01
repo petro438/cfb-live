@@ -43,6 +43,18 @@ function HomePage() {
   // Get API URL based on environment
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Fetch available seasons
   useEffect(() => {
     const fetchAvailableSeasons = async () => {
@@ -602,17 +614,20 @@ function HomePage() {
         }}>
           <thead>
             <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th style={{ 
-                padding: '6px 4px', 
-                border: '1px solid #dee2e6', 
-                textAlign: 'center',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                width: '60px'
-              }}>
-                RK
-              </th>
+              {/* Hide rank column on mobile */}
+              {!isMobile && (
+                <th style={{ 
+                  padding: '6px 4px', 
+                  border: '1px solid #dee2e6', 
+                  textAlign: 'center',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  width: '60px'
+                }}>
+                  RK
+                </th>
+              )}
               <th style={{ 
                 padding: '6px 4px', 
                 border: '1px solid #dee2e6', 
@@ -634,8 +649,7 @@ function HomePage() {
                 cursor: 'pointer',
                 width: '120px'
               }} onClick={() => handleSort('powerRating')}>
-                <div>POWER</div>
-                <div>RATING</div>
+                RATING
                 {sortField === 'powerRating' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
               <th style={{ 
@@ -648,8 +662,7 @@ function HomePage() {
                 cursor: 'pointer',
                 width: '120px'
               }} onClick={() => handleSort('offenseRating')}>
-                <div>OFFENSE</div>
-                <div>RATING</div>
+                OFF
                 {sortField === 'offenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
               <th style={{ 
@@ -662,8 +675,7 @@ function HomePage() {
                 cursor: 'pointer',
                 width: '120px'
               }} onClick={() => handleSort('defenseRating')}>
-                <div>DEFENSE</div>
-                <div>RATING</div>
+                DEF
                 {sortField === 'defenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
               <th style={{ 
@@ -676,8 +688,7 @@ function HomePage() {
                 cursor: 'pointer',
                 width: '120px'
               }} onClick={() => handleSort('strengthOfSchedule')}>
-                <div>STRENGTH OF</div>
-                <div>SCHEDULE</div>
+                SoS
                 {sortField === 'strengthOfSchedule' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
             </tr>
@@ -685,33 +696,38 @@ function HomePage() {
           <tbody>
             {sortedData.map((team, index) => {
               const currentRank = sortField === 'powerRating' ? team.displayPowerRank : index + 1;
+              const displayName = team.teamName.length > 15 ? team.abbreviation : team.teamName;
+              
               return (
                 <tr key={team.teamName} style={{ backgroundColor: index % 2 === 1 ? '#f8f9fa' : '#ffffff' }}>
-                  <td style={{
-                    backgroundColor: '#ffffff',
-                    padding: '6px 4px',
-                    border: '1px solid #dee2e6',
-                    textAlign: 'center',
-                    fontFamily: 'Consolas, monospace',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    width: '60px'
-                  }}>
-                    {currentRank}
-                  </td>
+                  {/* Hide rank column on mobile */}
+                  {!isMobile && (
+                    <td style={{
+                      backgroundColor: '#ffffff',
+                      padding: '6px 4px',
+                      border: '1px solid #dee2e6',
+                      textAlign: 'center',
+                      fontFamily: 'Consolas, monospace',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      width: '60px'
+                    }}>
+                      {currentRank}
+                    </td>
+                  )}
                   <td style={{
                       padding: '6px 8px',
                       border: '1px solid #dee2e6',
                       backgroundColor: '#ffffff',
                       minWidth: '220px'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <img 
                           src={team.logo} 
                           alt={`${team.teamName} logo`}
                           style={{ 
-                            width: '28px', 
-                            height: '28px',
+                            width: '24px', 
+                            height: '24px',
                             objectFit: 'contain',
                             flexShrink: 0
                           }}
@@ -723,7 +739,7 @@ function HomePage() {
                           <div style={{ 
                             fontWeight: 'bold', 
                             textTransform: 'uppercase',
-                            fontSize: '13px',
+                            fontSize: '12px',
                             lineHeight: '1.2',
                             cursor: 'pointer',
                             color: '#007bff',
@@ -733,10 +749,10 @@ function HomePage() {
                           onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
                           onMouseOut={(e) => e.target.style.textDecoration = 'none'}
                           >
-                            {team.teamName}
+                            {displayName}
                           </div>
                           <div style={{ 
-                            fontSize: '11px', 
+                            fontSize: '10px', 
                             color: '#6c757d',
                             lineHeight: '1.2'
                           }}>

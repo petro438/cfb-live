@@ -5,6 +5,7 @@ import TeamPage from './TeamPage';
 import SOSLeaderboard from './SOSLeaderboard';
 import LuckLeaderboard from './LuckLeaderboard';
 import PassingStatsPage from './PassingStatsPage';
+import RushingStatsPage from './RushingStatsPage';
 
 const Navigation = () => {
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -19,9 +20,10 @@ const Navigation = () => {
       ]
     },
     {
-      title: 'Stats',
+      title: 'Team Stats',
       items: [
-        { name: 'Passing Stats', path: '/passing-stats' }
+        { name: 'Passing Stats', path: '/passing-stats' },
+        { name: 'Rushing Stats', path: '/rushing-stats' }
       ]
     },
     {
@@ -402,8 +404,9 @@ function App() {
           {/* Games Category */}
           <Route path="/strength-of-schedule" element={<SOSLeaderboard />} />
           
-          {/* Stats Category */}
+          {/* Team Stats Category */}
           <Route path="/passing-stats" element={<PassingStatsPage />} />
+          <Route path="/rushing-stats" element={<RushingStatsPage />} />
           
           {/* Leaderboards Category */}
           <Route path="/luck-leaderboard" element={<LuckLeaderboard />} />

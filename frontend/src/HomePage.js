@@ -636,9 +636,9 @@ function HomePage() {
                 fontSize: '11px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
-                minWidth: isMobile ? '180px' : '180px',
-                maxWidth: isMobile ? '180px' : '220px',
-                width: isMobile ? '180px' : '220px'
+                minWidth: isMobile ? '160px' : '180px',
+                maxWidth: isMobile ? '160px' : '220px',
+                width: isMobile ? '160px' : '220px'
               }}>
                 TEAM
               </th>

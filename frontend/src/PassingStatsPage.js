@@ -765,7 +765,7 @@ const PassingStatsPage = () => {
                       padding: '4px 2px',
                       border: '1px solid #dee2e6',
                       fontFamily: 'Trebuchet MS, sans-serif',
-                      fontSize: '9px',
+                      fontSize: '14px',
                       fontWeight: 'bold',
                       textTransform: 'uppercase'
                     }}>
@@ -773,7 +773,7 @@ const PassingStatsPage = () => {
                         <img 
                           src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
                           alt={team.team}
-                          style={{ width: '12px', height: '12px', objectFit: 'contain' }}
+                          style={{ width: '18px', height: '18px', objectFit: 'contain' }}
                           onError={(e) => {
                             e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
                           }}
@@ -879,10 +879,10 @@ const PassingStatsPage = () => {
                 <th 
                   onClick={() => handleSort('games_played')}
                   style={{
-                    padding: '4px 2px',
+                    padding: '2px 1px',
                     border: '1px solid #dee2e6',
                     fontFamily: 'Trebuchet MS, sans-serif',
-                    fontSize: '9px',
+                    fontSize: '7px',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
                     textAlign: 'center',

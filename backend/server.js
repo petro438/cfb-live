@@ -536,7 +536,6 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
-// REPLACE your existing /api/leaderboards/passing/:season endpoint with this FIXED version:
 app.get('/api/leaderboards/passing/:season', async (req, res) => {
   try {
     const { season } = req.params;
@@ -549,108 +548,106 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     } = req.query;
     
     console.log(`🏈 Fetching passing stats: ${view_type} ${stat_type} for ${season}`);
+    console.log(`📊 Filters: season_type=${season_type}, conference_only=${conference_only}, conference=${conference}`);
     
-    // Base query - get all games for the season with filters
-    let gameFilters = [];
-    let gameParams = [season];
+    // STEP 1: Check if game_team_stats_new table exists and has data
+    const tableCheck = await pool.query(`
+      SELECT COUNT(*) as count, MIN(game_id) as min_game, MAX(game_id) as max_game
+      FROM game_team_stats_new 
+      WHERE completions IS NOT NULL
+    `);
+    
+    console.log('📋 Table check:', tableCheck.rows[0]);
+    
+    if (parseInt(tableCheck.rows[0].count) === 0) {
+      return res.status(404).json({
+        error: 'No data found in game_team_stats_new table',
+        details: 'The game_team_stats_new table appears to be empty or missing passing data'
+      });
+    }
+    
+    // STEP 2: Get all games for the season with filters
+    let gameQuery = `
+      SELECT id, home_team, away_team, season_type, conference_game
+      FROM games 
+      WHERE season = $1 AND completed = true
+    `;
+    
+    const gameParams = [season];
     
     if (season_type === 'regular') {
-      gameFilters.push(`g.season_type = 'regular'`);
+      gameQuery += ` AND season_type = 'regular'`;
     }
     
     if (conference_only === 'true') {
-      gameFilters.push(`g.conference_game = true`);
+      gameQuery += ` AND conference_game = true`;
     }
     
-    const gameWhereClause = gameFilters.length > 0 ? 
-      `AND ${gameFilters.join(' AND ')}` : '';
+    console.log('🎮 Game query:', gameQuery);
     
-    // For OFFENSE: get stats for the team directly
-    // For DEFENSE: get stats for opponents (inverse)
-    let mainQuery;
+    const gamesResult = await pool.query(gameQuery, gameParams);
+    const gameIds = gamesResult.rows.map(g => g.id);
+    
+    console.log(`📊 Found ${gameIds.length} games for ${season}`);
+    
+    if (gameIds.length === 0) {
+      return res.json({
+        teams: [],
+        metadata: {
+          season: parseInt(season),
+          view_type,
+          stat_type,
+          message: 'No completed games found for the specified filters'
+        }
+      });
+    }
+    
+    // STEP 3: Get team stats for those games
+    let statsQuery;
     
     if (view_type === 'offense') {
-      mainQuery = `
+      // OFFENSE: Get team's own stats
+      statsQuery = `
         SELECT 
           gts.team,
-          COUNT(DISTINCT g.id) as games_played,
-          SUM(gts.completions) as completions,
-          SUM(gts.attempts) as attempts,
-          CASE 
-            WHEN SUM(gts.attempts) > 0 
-            THEN (SUM(gts.completions)::float / SUM(gts.attempts)::float) * 100 
-            ELSE 0 
-          END as completion_percentage,
-          SUM(gts.net_passing_yards) as net_passing_yards,
-          CASE 
-            WHEN SUM(gts.attempts) > 0 
-            THEN SUM(gts.net_passing_yards)::float / SUM(gts.attempts)::float 
-            ELSE 0 
-          END as yards_per_attempt,
-          SUM(gts.passing_tds) as passing_touchdowns,
-          SUM(gts.interceptions_thrown) as interceptions,
-          -- For offense sacks, we need opponent sacks allowed to this team
-          COALESCE(SUM(opp_gts.sacks), 0) as sacks_taken
+          COUNT(DISTINCT gts.game_id) as games_played,
+          SUM(COALESCE(gts.completions, 0)) as completions,
+          SUM(COALESCE(gts.attempts, 0)) as attempts,
+          SUM(COALESCE(gts.net_passing_yards, 0)) as net_passing_yards,
+          SUM(COALESCE(gts.passing_tds, 0)) as passing_touchdowns,
+          SUM(COALESCE(gts.interceptions_thrown, 0)) as interceptions
         FROM game_team_stats_new gts
-        JOIN games g ON gts.game_id = g.id
-        LEFT JOIN game_team_stats_new opp_gts ON gts.game_id = opp_gts.game_id 
-          AND opp_gts.team != gts.team
-        WHERE g.season = $1 
-          AND g.completed = true
-          ${gameWhereClause}
+        WHERE gts.game_id = ANY($1)
         GROUP BY gts.team
+        HAVING COUNT(DISTINCT gts.game_id) > 0
+        ORDER BY gts.team
       `;
     } else {
-      // DEFENSE: get opponent passing stats (what we allowed)
-      mainQuery = `
+      // DEFENSE: Get opponent stats (what we allowed)
+      statsQuery = `
         SELECT 
           gts.team,
-          COUNT(DISTINCT g.id) as games_played,
-          SUM(opp_gts.completions) as completions,
-          SUM(opp_gts.attempts) as attempts,
-          CASE 
-            WHEN SUM(opp_gts.attempts) > 0 
-            THEN (SUM(opp_gts.completions)::float / SUM(opp_gts.attempts)::float) * 100 
-            ELSE 0 
-          END as completion_percentage,
-          SUM(opp_gts.net_passing_yards) as net_passing_yards,
-          CASE 
-            WHEN SUM(opp_gts.attempts) > 0 
-            THEN SUM(opp_gts.net_passing_yards)::float / SUM(opp_gts.attempts)::float 
-            ELSE 0 
-          END as yards_per_attempt,
-          SUM(opp_gts.passing_tds) as passing_touchdowns,
-          SUM(opp_gts.interceptions_thrown) as interceptions,
-          -- For defense, sacks are what we recorded (our sacks)
-          SUM(gts.sacks) as sacks_allowed
+          COUNT(DISTINCT gts.game_id) as games_played,
+          SUM(COALESCE(opp.completions, 0)) as completions,
+          SUM(COALESCE(opp.attempts, 0)) as attempts,
+          SUM(COALESCE(opp.net_passing_yards, 0)) as net_passing_yards,
+          SUM(COALESCE(opp.passing_tds, 0)) as passing_touchdowns,
+          SUM(COALESCE(opp.interceptions_thrown, 0)) as interceptions
         FROM game_team_stats_new gts
-        JOIN games g ON gts.game_id = g.id
-        JOIN game_team_stats_new opp_gts ON gts.game_id = opp_gts.game_id 
-          AND opp_gts.team != gts.team
-        WHERE g.season = $1 
-          AND g.completed = true
-          ${gameWhereClause}
+        JOIN game_team_stats_new opp ON gts.game_id = opp.game_id AND opp.team != gts.team
+        WHERE gts.game_id = ANY($1)
         GROUP BY gts.team
+        HAVING COUNT(DISTINCT gts.game_id) > 0
+        ORDER BY gts.team
       `;
     }
     
-    // Add conference filter if specified
-    if (conference && conference !== 'all') {
-      mainQuery += ` HAVING gts.team IN (
-        SELECT school FROM teams WHERE conference = $${gameParams.length + 1}
-      )`;
-      gameParams.push(conference);
-    }
+    console.log('📈 Stats query:', statsQuery.substring(0, 200) + '...');
     
-    mainQuery += ` ORDER BY gts.team`;
-    
-    console.log('🔍 Executing query:', mainQuery);
-    console.log('📊 Parameters:', gameParams);
-    
-    const statsResult = await pool.query(mainQuery, gameParams);
+    const statsResult = await pool.query(statsQuery, [gameIds]);
     const rawStats = statsResult.rows;
     
-    console.log(`📈 Found ${rawStats.length} teams with raw stats`);
+    console.log(`📊 Found stats for ${rawStats.length} teams`);
     
     if (rawStats.length === 0) {
       return res.json({
@@ -659,21 +656,17 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
           season: parseInt(season),
           view_type,
           stat_type,
-          season_type,
-          conference_only: conference_only === 'true',
-          conference,
-          total_teams: 0,
-          message: 'No data found for the specified filters'
+          message: 'No team stats found for the specified games'
         }
       });
     }
     
-    // Get team info (logos, conferences, etc.)
+    // STEP 4: Get team info (logos, conferences, etc.)
     const teamNames = rawStats.map(stat => stat.team);
     const teamInfoQuery = `
-      SELECT school, conference, logo_url, color, alt_color
+      SELECT school, conference, logo_url, color, alt_color, classification
       FROM teams 
-      WHERE school = ANY($1)
+      WHERE school = ANY($1) AND classification = 'fbs'
     `;
     
     const teamInfoResult = await pool.query(teamInfoQuery, [teamNames]);
@@ -682,44 +675,52 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
       teamInfoMap[team.school] = team;
     });
     
-    // Process stats and apply per-game calculation if needed
-    const processedTeams = rawStats.map(stat => {
-      const teamInfo = teamInfoMap[stat.team] || {};
-      const gamesPlayed = parseInt(stat.games_played) || 1;
-      
-      // For per-game stats, divide by games played
-      const divisor = stat_type === 'per_game' ? gamesPlayed : 1;
-      
-      return {
-        team: stat.team,
-        conference: teamInfo.conference || 'Unknown',
-        logo_url: teamInfo.logo_url || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
-        primary_color: teamInfo.color,
-        secondary_color: teamInfo.alt_color,
-        games_played: gamesPlayed,
-        completions: parseFloat((stat.completions / divisor).toFixed(1)),
-        attempts: parseFloat((stat.attempts / divisor).toFixed(1)),
-        completion_percentage: parseFloat(stat.completion_percentage.toFixed(1)),
-        passing_yards: parseFloat((stat.net_passing_yards / divisor).toFixed(1)),
-        yards_per_attempt: parseFloat(stat.yards_per_attempt.toFixed(2)),
-        passing_touchdowns: parseFloat((stat.passing_touchdowns / divisor).toFixed(1)),
-        interceptions: parseFloat((stat.interceptions / divisor).toFixed(1)),
-        sacks_allowed: view_type === 'offense' ? 
-          parseFloat((stat.sacks_taken / divisor).toFixed(1)) :
-          parseFloat((stat.sacks_allowed / divisor).toFixed(1))
-      };
-    });
+    console.log(`🏫 Found info for ${teamInfoResult.rows.length} FBS teams`);
     
-    // Filter to only FBS teams
-    const fbsTeams = processedTeams.filter(team => {
-      const teamInfo = teamInfoMap[team.team];
-      return teamInfo && teamInfo.conference; // Only teams with conferences (FBS)
-    });
+    // STEP 5: Process stats and calculate derived metrics
+    const processedTeams = rawStats
+      .filter(stat => teamInfoMap[stat.team]) // Only FBS teams
+      .map(stat => {
+        const teamInfo = teamInfoMap[stat.team];
+        const gamesPlayed = parseInt(stat.games_played) || 1;
+        
+        // Calculate derived stats
+        const attempts = parseInt(stat.attempts) || 0;
+        const completions = parseInt(stat.completions) || 0;
+        const completion_percentage = attempts > 0 ? (completions / attempts) * 100 : 0;
+        const yards_per_attempt = attempts > 0 ? parseInt(stat.net_passing_yards) / attempts : 0;
+        
+        // For per-game stats, divide by games played
+        const divisor = stat_type === 'per_game' ? gamesPlayed : 1;
+        
+        return {
+          team: stat.team,
+          conference: teamInfo.conference || 'Unknown',
+          logo_url: teamInfo.logo_url || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
+          primary_color: teamInfo.color,
+          secondary_color: teamInfo.alt_color,
+          games_played: gamesPlayed,
+          completions: parseFloat((completions / divisor).toFixed(1)),
+          attempts: parseFloat((attempts / divisor).toFixed(1)),
+          completion_percentage: parseFloat(completion_percentage.toFixed(1)),
+          passing_yards: parseFloat((parseInt(stat.net_passing_yards) / divisor).toFixed(1)),
+          yards_per_attempt: parseFloat(yards_per_attempt.toFixed(2)),
+          passing_touchdowns: parseFloat((parseInt(stat.passing_touchdowns) / divisor).toFixed(1)),
+          interceptions: parseFloat((parseInt(stat.interceptions) / divisor).toFixed(1)),
+          sacks_allowed: 0 // We'll add this in a later version
+        };
+      });
     
-    console.log(`✅ Returning ${fbsTeams.length} FBS teams`);
+    // STEP 6: Apply conference filter if specified
+    let finalTeams = processedTeams;
+    if (conference && conference !== 'all') {
+      finalTeams = processedTeams.filter(team => team.conference === conference);
+    }
+    
+    console.log(`✅ Returning ${finalTeams.length} teams after all filters`);
     
     res.json({
-      teams: fbsTeams,
+      teams: finalTeams,
       metadata: {
         season: parseInt(season),
         view_type,
@@ -727,8 +728,9 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
         season_type,
         conference_only: conference_only === 'true',
         conference,
-        total_teams: fbsTeams.length,
+        total_teams: finalTeams.length,
         raw_teams_found: rawStats.length,
+        fbs_teams_found: processedTeams.length,
         generated_at: new Date().toISOString()
       }
     });
@@ -738,7 +740,51 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     res.status(500).json({ 
       error: 'Internal server error', 
       details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       endpoint: '/api/leaderboards/passing/:season'
+    });
+  }
+});
+
+// Add a debug endpoint to check table structure
+app.get('/api/debug/game-team-stats', async (req, res) => {
+  try {
+    // Check table structure
+    const structure = await pool.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'game_team_stats_new'
+      ORDER BY ordinal_position
+    `);
+    
+    // Check sample data
+    const sample = await pool.query(`
+      SELECT * FROM game_team_stats_new 
+      WHERE completions IS NOT NULL 
+      LIMIT 3
+    `);
+    
+    // Check data counts
+    const counts = await pool.query(`
+      SELECT 
+        COUNT(*) as total_rows,
+        COUNT(DISTINCT team) as unique_teams,
+        COUNT(DISTINCT game_id) as unique_games,
+        COUNT(completions) as rows_with_completions
+      FROM game_team_stats_new
+    `);
+    
+    res.json({
+      table_structure: structure.rows,
+      sample_data: sample.rows,
+      data_counts: counts.rows[0],
+      table_exists: structure.rows.length > 0
+    });
+    
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+      table_exists: false
     });
   }
 });

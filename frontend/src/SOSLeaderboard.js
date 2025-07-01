@@ -739,13 +739,14 @@ const SOSLeaderboard = () => {
                   padding: '8px 4px', 
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
-                  borderRight: '3px solid #007bff', // Changed to blue
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  minWidth: '80px',
+                  display: activeTab === 'remaining' ? 'none' : 'table-cell' // Hide on remaining tab
                 }}
                 onClick={() => handleSort('win_difference')}
               >
@@ -769,7 +770,12 @@ const SOSLeaderboard = () => {
                 }}
                 onClick={() => handleSort('top40_games')}
               >
-                TOP 40
+                <span className="top40-header-remaining" style={{ display: activeTab === 'remaining' ? 'inline' : 'none' }}>
+                  TOP 40 GAMES
+                </span>
+                <span className="top40-header-default" style={{ display: activeTab === 'remaining' ? 'none' : 'inline' }}>
+                  TOP 40
+                </span>
                 <span className="sort-arrow-desktop">{getSortArrow('top40_games')}</span>
               </th>
               

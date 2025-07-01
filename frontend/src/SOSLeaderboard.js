@@ -184,12 +184,15 @@ const SOSLeaderboard = () => {
         const powerRatingsData = await powerRatingsResponse.json();
         const powerRatings = Array.isArray(powerRatingsData) ? powerRatingsData : powerRatingsData.teams || [];
         
-        // Create a map for quick lookup of power ratings and ranks
+        // Create a map for quick lookup of power ratings and ranks (FBS ONLY)
         const powerRatingMap = new Map();
-        powerRatings.forEach((team, index) => {
+        powerRatings.filter(team => {
+          // Only include FBS teams for ranking calculations
+          return team.classification === 'fbs' || team.classification === 'FBS';
+        }).forEach((team, index) => {
           powerRatingMap.set(team.team_name || team.teamName, {
             rating: team.power_rating || team.powerRating,
-            rank: team.power_rank || team.powerRank || index + 1
+            rank: index + 1 // Now ranks 1-134 for FBS only
           });
         });
         
@@ -694,14 +697,15 @@ const SOSLeaderboard = () => {
                   padding: '8px 4px', 
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
-                  borderLeft: '3px solid #28a745',
-                  backgroundColor: '#f8fff8',
+                  borderLeft: '3px solid #007bff', // Changed to blue
+                  backgroundColor: '#e3f2fd', // Light blue background
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  width: '70px' // Reduced width for mobile
                 }}
                 onClick={() => handleSort('actual_wins')}
               >
@@ -714,17 +718,19 @@ const SOSLeaderboard = () => {
                   padding: '8px 4px', 
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
-                  backgroundColor: '#f8fff8',
+                  backgroundColor: '#e3f2fd', // Light blue background
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  width: '70px' // Reduced width for mobile
                 }}
                 onClick={() => handleSort('projected_wins')}
               >
-                EXP. WINS
+                <span className="exp-wins-desktop">EXP. WINS</span>
+                <span className="exp-wins-mobile" style={{ display: 'none' }}>EXP<br/>WINS</span>
                 <span className="sort-arrow-desktop">{getSortArrow('projected_wins')}</span>
               </th>
               
@@ -733,8 +739,7 @@ const SOSLeaderboard = () => {
                   padding: '8px 4px', 
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
-                  borderRight: '3px solid #28a745',
-                  backgroundColor: '#f8fff8',
+                  borderRight: '3px solid #007bff', // Changed to blue
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
                   fontSize: '12px',
@@ -744,7 +749,8 @@ const SOSLeaderboard = () => {
                 }}
                 onClick={() => handleSort('win_difference')}
               >
-                ACT VS EXP
+                <span className="act-vs-exp-desktop">ACT VS EXP</span>
+                <span className="act-vs-exp-mobile" style={{ display: 'none' }}>ACT VS<br/>EXP</span>
                 <span className="sort-arrow-desktop">{getSortArrow('win_difference')}</span>
               </th>
               
@@ -885,13 +891,13 @@ const SOSLeaderboard = () => {
                   <td style={{ 
                     padding: '8px 4px', 
                     border: '1px solid #dee2e6',
-                    borderLeft: '3px solid #28a745',
-                    backgroundColor: '#f8fff8',
+                    borderLeft: '3px solid #007bff', // Changed to blue
+                    backgroundColor: '#e3f2fd', // Light blue background
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
                     fontSize: '14px',
-                    width: '80px'
+                    width: '70px' // Reduced width
                   }}>
                     {activeTab === 'remaining' ? '0-0' : 
                      `${getTabValue(team, 'actual_wins')}-${getTabValue(team, 'actual_losses')}`}
@@ -901,46 +907,59 @@ const SOSLeaderboard = () => {
                   <td style={{
                     padding: '8px 4px',
                     border: '1px solid #dee2e6',
-                    backgroundColor: '#f8fff8',
+                    backgroundColor: '#e3f2fd', // Light blue background
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
                     fontSize: '14px',
-                    width: '80px'
+                    width: '70px' // Reduced width
                   }}>
                     {getTabValue(team, 'projected_wins').toFixed(1)}
                   </td>
                   
-                  {/* Win Difference */}
-                  <td style={{
-                    padding: '8px 4px',
-                    border: '1px solid #dee2e6',
-                    borderRight: '3px solid #28a745',
-                    backgroundColor: (() => {
-                      if (activeTab === 'remaining') return '#f8fff8';
-                      const diff = getTabValue(team, 'win_difference');
-                      if (diff > 1) return '#d4edda';
-                      if (diff < -1) return '#f8d7da';
-                      return '#f8fff8';
-                    })(),
-                    fontFamily: 'Consolas, monospace',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    width: '90px',
-                    color: (() => {
-                      if (activeTab === 'remaining') return '#212529';
-                      const diff = getTabValue(team, 'win_difference');
-                      if (diff > 1) return '#155724';
-                      if (diff < -1) return '#721c24';
-                      return '#212529';
-                    })()
-                  }}>
-                    {(() => {
-                      const diff = getTabValue(team, 'win_difference');
-                      return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
-                    })()}
-                  </td>
+                  {/* Win Difference - Now uses 20-color percentile system */}
+                  {(() => {
+                    const diff = getTabValue(team, 'win_difference');
+                    const diffRank = getSortedAndFilteredData()
+                      .sort((a, b) => getTabValue(b, 'win_difference') - getTabValue(a, 'win_difference'))
+                      .findIndex(t => t.team === team.team) + 1;
+                    const diffColors = getRankColor(diffRank, totalTeams, true); // Higher difference = better = green
+                    
+                    return (
+                      <td style={{
+                        padding: '8px 4px',
+                        border: '1px solid #dee2e6',
+                        borderRight: '3px solid #007bff', // Changed to blue
+                        backgroundColor: diffColors.bg,
+                        color: diffColors.text,
+                        fontFamily: 'Consolas, monospace',
+                        textAlign: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        width: '90px'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <div style={{ fontSize: '12px', lineHeight: '1' }}>
+                            {`${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
+                          </div>
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: 'normal',
+                            opacity: 0.8,
+                            marginTop: '2px',
+                            lineHeight: '1'
+                          }}>
+                            #{diffRank}
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })()}
                   
                   {/* Top 40 Record */}
                   <td style={{ 
@@ -984,7 +1003,7 @@ const SOSLeaderboard = () => {
                         gap: '2px',
                         color: '#007bff'
                       }}>
-                        <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop">🪙</span>
+                        <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop difficulty-emojis-mobile">🪙</span>
                         <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'coinflip_games')}</span>
                       </div>
                       
@@ -994,7 +1013,7 @@ const SOSLeaderboard = () => {
                         gap: '2px',
                         color: '#28a745'
                       }}>
-                        <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop">🔒</span>
+                        <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop difficulty-emojis-mobile">🔒</span>
                         <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'sure_thing_games')}</span>
                       </div>
                       
@@ -1004,7 +1023,7 @@ const SOSLeaderboard = () => {
                         gap: '2px',
                         color: '#dc3545'
                       }}>
-                        <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop">🎯</span>
+                        <span style={{ fontSize: '10px' }} className="difficulty-emojis-desktop difficulty-emojis-mobile">🎯</span>
                         <span style={{ fontWeight: 'bold' }}>{getTabValue(team, 'longshot_games')}</span>
                       </div>
                     </div>
@@ -1068,6 +1087,19 @@ const SOSLeaderboard = () => {
           .sos-header-mobile {
             display: inline !important;
           }
+          /* Mobile header text changes */
+          .exp-wins-desktop {
+            display: none !important;
+          }
+          .exp-wins-mobile {
+            display: inline !important;
+          }
+          .act-vs-exp-desktop {
+            display: none !important;
+          }
+          .act-vs-exp-mobile {
+            display: inline !important;
+          }
           table {
             min-width: 600px;
           }
@@ -1076,6 +1108,10 @@ const SOSLeaderboard = () => {
           td:nth-child(4), /* Expected Wins */
           td:nth-child(5) { /* Act vs Exp */
             font-size: 11px !important;
+          }
+          /* Show emojis on mobile for difficulty */
+          .difficulty-emojis-mobile {
+            display: inline !important;
           }
         }
         @media (min-width: 769px) {

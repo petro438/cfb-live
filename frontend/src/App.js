@@ -8,6 +8,7 @@ import PassingStatsPage from './PassingStatsPage';
 
 const Navigation = () => {
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   const navigationCategories = [
@@ -51,36 +52,52 @@ const Navigation = () => {
     return category.items.some(item => isActivePath(item.path));
   };
 
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+    setActiveDropdown(null);
+  };
+
+  const toggleCategoryDropdown = (categoryTitle) => {
+    setActiveDropdown(activeDropdown === categoryTitle ? null : categoryTitle);
+  };
+
   return (
     <nav style={{
       backgroundColor: '#343a40',
       padding: '0',
       fontFamily: '"Trebuchet MS", Arial, sans-serif',
-      borderBottom: '1px solid #dee2e6'
+      borderBottom: '1px solid #dee2e6',
+      position: 'relative'
     }}>
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto',
         display: 'flex',
-        alignItems: 'center'
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0'
       }}>
         {/* Logo/Home */}
         <Link 
           to="/" 
+          onClick={closeMobileMenu}
           style={{
             color: 'white',
             textDecoration: 'none',
             fontWeight: 'bold',
             fontSize: '20px',
-            padding: '16px 20px',
-            borderRight: '1px solid #495057'
+            padding: '16px 20px'
           }}
         >
           CFB ANALYTICS
         </Link>
 
-        {/* Navigation Categories */}
-        <div style={{ display: 'flex', flex: 1 }}>
+        {/* Desktop Navigation */}
+        <div style={{ 
+          display: 'flex', 
+          flex: 1,
+          '@media (max-width: 768px)': { display: 'none' }
+        }} className="desktop-nav">
           {navigationCategories.map((category, index) => (
             <div
               key={category.title}
@@ -110,7 +127,7 @@ const Navigation = () => {
                 )}
               </div>
 
-              {/* Dropdown Menu */}
+              {/* Desktop Dropdown Menu */}
               {category.items.length > 0 && activeDropdown === category.title && (
                 <div
                   style={{
@@ -182,7 +199,188 @@ const Navigation = () => {
             </div>
           ))}
         </div>
+
+        {/* Mobile Hamburger Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{
+            display: 'none',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'white',
+            fontSize: '24px',
+            padding: '16px 20px',
+            cursor: 'pointer'
+          }}
+          className="mobile-hamburger"
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            right: '0',
+            bottom: '0',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999
+          }}
+          onClick={closeMobileMenu}
+        />
+      )}
+
+      {/* Mobile Menu */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '0',
+          right: mobileMenuOpen ? '0' : '-300px',
+          height: '100vh',
+          width: '280px',
+          backgroundColor: '#343a40',
+          transition: 'right 0.3s ease',
+          zIndex: 1000,
+          overflowY: 'auto',
+          boxShadow: mobileMenuOpen ? '-2px 0 5px rgba(0, 0, 0, 0.1)' : 'none'
+        }}
+        className="mobile-menu"
+      >
+        {/* Mobile Menu Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid #495057',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ color: 'white', fontWeight: 'bold', fontSize: '18px' }}>
+            Menu
+          </span>
+          <button
+            onClick={closeMobileMenu}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: 'white',
+              fontSize: '20px',
+              cursor: 'pointer'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Mobile Menu Items */}
+        <div style={{ padding: '0' }}>
+          {/* Home Link */}
+          <Link
+            to="/"
+            onClick={closeMobileMenu}
+            style={{
+              display: 'block',
+              padding: '16px 20px',
+              color: location.pathname === '/' ? '#58c36c' : 'white',
+              textDecoration: 'none',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              borderBottom: '1px solid #495057',
+              backgroundColor: location.pathname === '/' ? '#495057' : 'transparent'
+            }}
+          >
+            Home
+          </Link>
+
+          {/* Category Sections */}
+          {navigationCategories.map((category) => (
+            <div key={category.title}>
+              {/* Category Header */}
+              <div
+                onClick={() => category.items.length > 0 && toggleCategoryDropdown(category.title)}
+                style={{
+                  padding: '16px 20px',
+                  color: isCategoryActive(category) ? '#58c36c' : 'white',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  borderBottom: '1px solid #495057',
+                  backgroundColor: isCategoryActive(category) ? '#495057' : 'transparent',
+                  cursor: category.items.length > 0 ? 'pointer' : 'default',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                {category.title}
+                {category.items.length > 0 && (
+                  <span style={{ fontSize: '14px' }}>
+                    {activeDropdown === category.title ? '▲' : '▼'}
+                  </span>
+                )}
+              </div>
+
+              {/* Category Items */}
+              {category.items.length > 0 && activeDropdown === category.title && (
+                <div style={{ backgroundColor: '#495057' }}>
+                  {category.items.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={closeMobileMenu}
+                      style={{
+                        display: 'block',
+                        padding: '12px 40px',
+                        color: isActivePath(item.path) ? '#58c36c' : '#f8f9fa',
+                        textDecoration: 'none',
+                        fontSize: '14px',
+                        fontWeight: isActivePath(item.path) ? 'bold' : 'normal',
+                        borderBottom: '1px solid #6c757d'
+                      }}
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Empty Category Message */}
+              {category.items.length === 0 && activeDropdown === category.title && (
+                <div style={{
+                  padding: '12px 40px',
+                  color: '#6c757d',
+                  fontSize: '14px',
+                  fontStyle: 'italic',
+                  backgroundColor: '#495057',
+                  borderBottom: '1px solid #6c757d'
+                }}>
+                  Coming soon...
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CSS for responsive design */}
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .desktop-nav {
+            display: none !important;
+          }
+          .mobile-hamburger {
+            display: block !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-menu {
+            display: none !important;
+          }
+        }
+      `}</style>
     </nav>
   );
 };
@@ -205,17 +403,10 @@ function App() {
           <Route path="/strength-of-schedule" element={<SOSLeaderboard />} />
           
           {/* Stats Category */}
-          <Route path="/passing-stats" element={<PassingStatsPage />} />  {/* ← ADD THIS LINE */}
-          {/* Add stats routes here later */}
+          <Route path="/passing-stats" element={<PassingStatsPage />} />
           
           {/* Leaderboards Category */}
           <Route path="/luck-leaderboard" element={<LuckLeaderboard />} />
-          
-          {/* Betting Category */}
-          {/* Add betting routes here later */}
-          
-          {/* Fun Category */}
-          {/* Add fun routes here later */}
           
           {/* Catch-all route */}
           <Route path="*" element={<div>Page not found</div>} />

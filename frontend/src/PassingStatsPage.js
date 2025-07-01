@@ -7,12 +7,11 @@ const PassingStatsPage = () => {
   
   // Filter states
   const [selectedSeason, setSelectedSeason] = useState(2024);
-  const [viewType, setViewType] = useState('offense'); // offense or defense
-  const [statCategory, setStatCategory] = useState('basic'); // basic or advanced (for future)
-  const [statType, setStatType] = useState('total'); // total or per_game
-  const [seasonType, setSeasonType] = useState('regular'); // regular or all
-  const [conferenceOnly, setConferenceOnly] = useState(false);
   const [selectedConference, setSelectedConference] = useState('all');
+  const [viewType, setViewType] = useState('offense'); // offense or defense
+  const [statCategory, setStatCategory] = useState('basic'); // basic or advanced
+  const [conferenceOnly, setConferenceOnly] = useState(false);
+  const [regularSeasonOnly, setRegularSeasonOnly] = useState(true);
   
   // Sorting state
   const [sortConfig, setSortConfig] = useState({ key: 'passing_yards', direction: 'desc' });
@@ -47,11 +46,11 @@ const PassingStatsPage = () => {
     return '#ea4335'; // Worst
   };
 
-  // Calculate rankings for each stat
+  // Calculate rankings for each stat with defense-specific logic
   const calculateRankings = (data) => {
     const rankings = {};
     const statFields = [
-      'games_played', 'completions', 'attempts', 'completion_percentage',
+      'completions', 'attempts', 'completion_percentage',
       'passing_yards', 'yards_per_attempt', 'passing_touchdowns', 
       'interceptions', 'sacks_allowed'
     ];
@@ -60,12 +59,22 @@ const PassingStatsPage = () => {
       const sortedTeams = [...data]
         .filter(team => team[field] !== null && team[field] !== undefined)
         .sort((a, b) => {
-          // Lower is better for interceptions and sacks
-          if (field === 'interceptions' || field === 'sacks_allowed') {
-            return a[field] - b[field];
+          // For DEFENSE: Lower is better for most stats (what we allowed)
+          // EXCEPT: interceptions and sacks_allowed (higher is better - more sacks/picks)
+          if (viewType === 'defense') {
+            if (field === 'interceptions' || field === 'sacks_allowed') {
+              return b[field] - a[field]; // Higher is better
+            } else {
+              return a[field] - b[field]; // Lower is better (less allowed)
+            }
+          } else {
+            // For OFFENSE: Higher is better for everything except interceptions
+            if (field === 'interceptions') {
+              return a[field] - b[field]; // Lower is better
+            } else {
+              return b[field] - a[field]; // Higher is better
+            }
           }
-          // Higher is better for everything else
-          return b[field] - a[field];
         });
       
       rankings[field] = {};
@@ -87,8 +96,8 @@ const PassingStatsPage = () => {
       
       const params = new URLSearchParams({
         view_type: viewType,
-        stat_type: statType,
-        season_type: seasonType,
+        stat_type: 'total', // Always use total for now
+        season_type: regularSeasonOnly ? 'regular' : 'all',
         conference_only: conferenceOnly.toString(),
         ...(selectedConference !== 'all' && { conference: selectedConference })
       });
@@ -121,7 +130,7 @@ const PassingStatsPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [selectedSeason, viewType, statType, seasonType, conferenceOnly, selectedConference]);
+  }, [selectedSeason, viewType, regularSeasonOnly, conferenceOnly, selectedConference]);
 
   // Sorting function
   const handleSort = (key) => {
@@ -169,7 +178,22 @@ const PassingStatsPage = () => {
       <span style={{ color: '#007bff', marginLeft: '4px' }}>↓</span>;
   };
 
-  const CellWithRank = ({ value, statKey, team, isDesktop = true }) => {
+  const CellWithRank = ({ value, statKey, team, isDesktop = true, skipRanking = false }) => {
+    if (skipRanking) {
+      return (
+        <td style={{
+          padding: '8px',
+          border: '1px solid #dee2e6',
+          fontFamily: 'Consolas, monospace',
+          fontSize: '13px',
+          textAlign: 'center',
+          backgroundColor: '#ffffff'
+        }}>
+          <span style={{ fontFamily: 'Consolas, monospace' }}>{value}</span>
+        </td>
+      );
+    }
+
     const ranking = rankings[statKey]?.[team];
     const backgroundColor = ranking ? getPercentileColor(ranking.rank, ranking.total) : '#ffffff';
     
@@ -177,21 +201,23 @@ const PassingStatsPage = () => {
       <td style={{
         backgroundColor,
         position: 'relative',
-        padding: '8px',
+        padding: '8px 16px', // Wider padding for desktop
         border: '1px solid #dee2e6',
         fontFamily: 'Consolas, monospace',
         fontSize: '13px',
-        textAlign: 'center'
+        textAlign: 'center',
+        minWidth: '80px' // Minimum width for better spacing
       }}>
         <span style={{ fontFamily: 'Consolas, monospace' }}>{value}</span>
         {isDesktop && ranking && (
           <span style={{
             position: 'absolute',
-            bottom: '2px',
-            right: '4px',
+            bottom: '3px',
+            right: '6px',
             fontSize: '10px',
             color: '#6c757d',
-            fontFamily: 'Trebuchet MS, sans-serif'
+            fontFamily: 'Trebuchet MS, sans-serif',
+            fontWeight: 'bold'
           }}>
             {ranking.rank}
           </span>
@@ -247,44 +273,80 @@ const PassingStatsPage = () => {
         }}>
           {viewType.toUpperCase()} PASSING STATS
         </h1>
-        <p style={{ 
-          margin: 0, 
-          color: '#6c757d',
-          fontSize: '14px'
-        }}>
-          {statCategory === 'basic' ? 'Basic' : 'Advanced'} passing statistics - {statType === 'total' ? 'Season Totals' : 'Per Game Averages'}
-        </p>
       </div>
 
-      {/* Controls */}
+      {/* Top Row: Season & Conference */}
       <div style={{ 
-        marginBottom: '16px',
+        marginBottom: '12px',
         display: 'flex',
-        flexWrap: 'wrap',
+        gap: '16px',
+        alignItems: 'center',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label style={{ 
+            fontFamily: 'Trebuchet MS, sans-serif', 
+            fontSize: '12px', 
+            fontWeight: 'bold',
+            color: '#212529'
+          }}>
+            SEASON:
+          </label>
+          <select 
+            value={selectedSeason} 
+            onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
+            style={{
+              padding: '6px 8px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '12px'
+            }}
+          >
+            <option value={2024}>2024</option>
+            <option value={2023}>2023</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label style={{ 
+            fontFamily: 'Trebuchet MS, sans-serif', 
+            fontSize: '12px', 
+            fontWeight: 'bold',
+            color: '#212529'
+          }}>
+            CONFERENCE:
+          </label>
+          <select 
+            value={selectedConference} 
+            onChange={(e) => setSelectedConference(e.target.value)}
+            style={{
+              padding: '6px 8px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '12px'
+            }}
+          >
+            <option value="all">All Conferences</option>
+            {availableConferences.map(conf => (
+              <option key={conf} value={conf}>{conf}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Middle Row: Page-Specific Buttons */}
+      <div style={{ 
+        marginBottom: '12px',
+        display: 'flex',
         gap: '8px',
         alignItems: 'center'
       }}>
-        {/* Season Selector */}
-        <select 
-          value={selectedSeason} 
-          onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
-          style={{
-            padding: '6px 8px',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px'
-          }}
-        >
-          <option value={2024}>2024 Season</option>
-          <option value={2023}>2023 Season</option>
-        </select>
-
-        {/* Offense/Defense Toggle */}
         <button
           onClick={() => setViewType(viewType === 'offense' ? 'defense' : 'offense')}
           style={{
-            padding: '6px 12px',
+            padding: '8px 16px',
             backgroundColor: viewType === 'offense' ? '#007bff' : '#6c757d',
             color: 'white',
             border: 'none',
@@ -298,11 +360,10 @@ const PassingStatsPage = () => {
           {viewType.toUpperCase()}
         </button>
 
-        {/* Basic/Advanced Toggle */}
         <button
           onClick={() => setStatCategory(statCategory === 'basic' ? 'advanced' : 'basic')}
           style={{
-            padding: '6px 12px',
+            padding: '8px 16px',
             backgroundColor: statCategory === 'basic' ? '#007bff' : '#6c757d',
             color: 'white',
             border: 'none',
@@ -313,80 +374,48 @@ const PassingStatsPage = () => {
             fontWeight: 'bold'
           }}
         >
-          {statCategory.toUpperCase()} STATS
+          {statCategory.toUpperCase()}
         </button>
+      </div>
 
-        {/* Total/Per Game Toggle */}
-        <button
-          onClick={() => setStatType(statType === 'total' ? 'per_game' : 'total')}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: statType === 'total' ? '#007bff' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
-        >
-          {statType === 'total' ? 'TOTAL' : 'PER GAME'}
-        </button>
+      {/* Bottom Row: Checkboxes */}
+      <div style={{ 
+        marginBottom: '16px',
+        display: 'flex',
+        gap: '16px',
+        alignItems: 'center'
+      }}>
+        <label style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px',
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '12px',
+          cursor: 'pointer'
+        }}>
+          <input
+            type="checkbox"
+            checked={conferenceOnly}
+            onChange={(e) => setConferenceOnly(e.target.checked)}
+          />
+          CONFERENCE GAMES ONLY
+        </label>
 
-        {/* Season Type Toggle */}
-        <button
-          onClick={() => setSeasonType(seasonType === 'regular' ? 'all' : 'regular')}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: seasonType === 'regular' ? '#007bff' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
-        >
-          {seasonType === 'regular' ? 'REGULAR' : 'ALL GAMES'}
-        </button>
-
-        {/* Conference Only Toggle */}
-        <button
-          onClick={() => setConferenceOnly(!conferenceOnly)}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: conferenceOnly ? '#007bff' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
-        >
-          {conferenceOnly ? 'CONF ONLY' : 'ALL GAMES'}
-        </button>
-
-        {/* Conference Filter */}
-        <select 
-          value={selectedConference} 
-          onChange={(e) => setSelectedConference(e.target.value)}
-          style={{
-            padding: '6px 8px',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px'
-          }}
-        >
-          <option value="all">All Conferences</option>
-          {availableConferences.map(conf => (
-            <option key={conf} value={conf}>{conf}</option>
-          ))}
-        </select>
+        <label style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px',
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '12px',
+          cursor: 'pointer'
+        }}>
+          <input
+            type="checkbox"
+            checked={regularSeasonOnly}
+            onChange={(e) => setRegularSeasonOnly(e.target.checked)}
+          />
+          REGULAR SEASON ONLY
+        </label>
       </div>
 
       {/* Results Info */}
@@ -425,14 +454,15 @@ const PassingStatsPage = () => {
               <th 
                 onClick={() => handleSort('team')}
                 style={{
-                  padding: '8px',
+                  padding: '8px 16px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontSize: '12px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  textAlign: 'left'
+                  textAlign: 'left',
+                  minWidth: '180px'
                 }}
               >
                 TEAM{getSortIcon('team')}
@@ -440,82 +470,7 @@ const PassingStatsPage = () => {
               <th 
                 onClick={() => handleSort('games_played')}
                 style={{
-                  padding: '8px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                GP{getSortIcon('games_played')}
-              </th>
-              <th 
-                onClick={() => handleSort('completions')}
-                style={{
-                  padding: '8px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                COMP{getSortIcon('completions')}
-              </th>
-              <th 
-                onClick={() => handleSort('attempts')}
-                style={{
-                  padding: '8px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                ATT{getSortIcon('attempts')}
-              </th>
-              <th 
-                onClick={() => handleSort('completion_percentage')}
-                style={{
-                  padding: '8px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                COMP%{getSortIcon('completion_percentage')}
-              </th>
-              <th 
-                onClick={() => handleSort('passing_yards')}
-                style={{
-                  padding: '8px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                YARDS{getSortIcon('passing_yards')}
-              </th>
-              <th 
-                onClick={() => handleSort('yards_per_attempt')}
-                style={{
-                  padding: '8px',
+                  padding: '8px 16px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontSize: '12px',
@@ -523,7 +478,88 @@ const PassingStatsPage = () => {
                   textTransform: 'uppercase',
                   cursor: 'pointer',
                   textAlign: 'center',
-                  lineHeight: '1.2'
+                  minWidth: '60px'
+                }}
+              >
+                GP{getSortIcon('games_played')}
+              </th>
+              <th 
+                onClick={() => handleSort('completions')}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minWidth: '80px'
+                }}
+              >
+                COMP{getSortIcon('completions')}
+              </th>
+              <th 
+                onClick={() => handleSort('attempts')}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minWidth: '80px'
+                }}
+              >
+                ATT{getSortIcon('attempts')}
+              </th>
+              <th 
+                onClick={() => handleSort('completion_percentage')}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minWidth: '80px'
+                }}
+              >
+                COMP%{getSortIcon('completion_percentage')}
+              </th>
+              <th 
+                onClick={() => handleSort('passing_yards')}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minWidth: '90px'
+                }}
+              >
+                YARDS{getSortIcon('passing_yards')}
+              </th>
+              <th 
+                onClick={() => handleSort('yards_per_attempt')}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  lineHeight: '1.2',
+                  minWidth: '80px'
                 }}
               >
                 YARDS/<br/>ATT{getSortIcon('yards_per_attempt')}
@@ -531,14 +567,15 @@ const PassingStatsPage = () => {
               <th 
                 onClick={() => handleSort('passing_touchdowns')}
                 style={{
-                  padding: '8px',
+                  padding: '8px 16px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontSize: '12px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  minWidth: '60px'
                 }}
               >
                 TD{getSortIcon('passing_touchdowns')}
@@ -546,14 +583,15 @@ const PassingStatsPage = () => {
               <th 
                 onClick={() => handleSort('interceptions')}
                 style={{
-                  padding: '8px',
+                  padding: '8px 16px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontSize: '12px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  minWidth: '60px'
                 }}
               >
                 INT{getSortIcon('interceptions')}
@@ -561,14 +599,15 @@ const PassingStatsPage = () => {
               <th 
                 onClick={() => handleSort('sacks_allowed')}
                 style={{
-                  padding: '8px',
+                  padding: '8px 16px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontSize: '12px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   cursor: 'pointer',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  minWidth: '80px'
                 }}
               >
                 SACKS{getSortIcon('sacks_allowed')}
@@ -581,7 +620,7 @@ const PassingStatsPage = () => {
                 backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
               }}>
                 <td style={{
-                  padding: '8px',
+                  padding: '8px 16px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontSize: '13px',
@@ -605,6 +644,7 @@ const PassingStatsPage = () => {
                   statKey="games_played" 
                   team={team.team}
                   isDesktop={true}
+                  skipRanking={true}
                 />
                 <CellWithRank 
                   value={formatNumber(team.completions, 1)} 
@@ -659,7 +699,7 @@ const PassingStatsPage = () => {
           </tbody>
         </table>
 
-        {/* Mobile Table */}
+        {/* Mobile Table - More columns */}
         <table className="mobile-table" style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
@@ -672,7 +712,7 @@ const PassingStatsPage = () => {
                 padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 textAlign: 'left'
@@ -683,7 +723,7 @@ const PassingStatsPage = () => {
                 padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 textAlign: 'center'
@@ -694,7 +734,18 @@ const PassingStatsPage = () => {
                 padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '11px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                textAlign: 'center'
+              }}>
+                ATT
+              </th>
+              <th style={{
+                padding: '6px',
+                border: '1px solid #dee2e6',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '10px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 textAlign: 'center'
@@ -705,12 +756,23 @@ const PassingStatsPage = () => {
                 padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 textAlign: 'center'
               }}>
                 TD
+              </th>
+              <th style={{
+                padding: '6px',
+                border: '1px solid #dee2e6',
+                fontFamily: 'Trebuchet MS, sans-serif',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                textAlign: 'center'
+              }}>
+                INT
               </th>
             </tr>
           </thead>
@@ -723,7 +785,7 @@ const PassingStatsPage = () => {
                   padding: '6px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '11px',
+                  fontSize: '10px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase'
                 }}>
@@ -731,31 +793,43 @@ const PassingStatsPage = () => {
                     <img 
                       src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
                       alt={team.team}
-                      style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+                      style={{ width: '14px', height: '14px', objectFit: 'contain' }}
                       onError={(e) => {
                         e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
                       }}
                     />
-                    <span style={{ fontSize: '10px' }}>
-                      {team.team?.length > 8 ? team.team.substring(0, 8) + '...' : team.team}
+                    <span style={{ fontSize: '9px' }}>
+                      {team.team?.length > 6 ? team.team.substring(0, 6) + '...' : team.team}
                     </span>
                   </div>
                 </td>
                 <CellWithRank 
-                  value={formatNumber(team.completions, 1)} 
+                  value={formatNumber(team.completions, 0)} 
                   statKey="completions" 
                   team={team.team}
                   isDesktop={false}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.passing_yards, 1)} 
+                  value={formatNumber(team.attempts, 0)} 
+                  statKey="attempts" 
+                  team={team.team}
+                  isDesktop={false}
+                />
+                <CellWithRank 
+                  value={formatNumber(team.passing_yards, 0)} 
                   statKey="passing_yards" 
                   team={team.team}
                   isDesktop={false}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.passing_touchdowns, 1)} 
+                  value={formatNumber(team.passing_touchdowns, 0)} 
                   statKey="passing_touchdowns" 
+                  team={team.team}
+                  isDesktop={false}
+                />
+                <CellWithRank 
+                  value={formatNumber(team.interceptions, 0)} 
+                  statKey="interceptions" 
                   team={team.team}
                   isDesktop={false}
                 />

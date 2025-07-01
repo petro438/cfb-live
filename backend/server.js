@@ -1,0 +1,1993 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config({ path: './dataconfig.env' });
+const { Pool } = require('pg');
+
+const app = express();
+const port = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors({
+  origin: function (origin, callback) {
+    console.log('🔍 CORS request from origin:', origin);
+    
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) {
+      console.log('✅ Allowing request with no origin');
+      return callback(null, true);
+    }
+    
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      console.log('✅ Allowing localhost request');
+      return callback(null, true);
+    }
+    
+    // Allow any Railway domain
+    if (origin.includes('.up.railway.app')) {
+      console.log('✅ Allowing Railway domain request');
+      return callback(null, true);
+    }
+    
+    // Log blocked requests for debugging
+    console.log('❌ CORS blocked request from:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// PostgreSQL connection - USES DATABASE_URL ONLY
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Test database connection
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('Error connecting to PostgreSQL:', err);
+  } else {
+    const dbName = process.env.DATABASE_URL ? 
+      process.env.DATABASE_URL.split('/').pop().split('?')[0] : 'Unknown';
+    console.log(`Connected to PostgreSQL database: ${dbName}`);
+    release();
+  }
+});
+
+// Helper function for normal distribution CDF
+function normalCDF(x, mean = 0, stdDev = 1) {
+  const z = (x - mean) / stdDev;
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  let prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  if (z > 0) prob = 1 - prob;
+  return prob;
+}
+
+// Helper function for win probability calculation (add this near your existing normalCDF function)
+function calculateWinProbability(teamRating, opponentRating, isHome = true) {
+  const homeAdvantage = isHome ? 2.15 : -2.15;
+  const ratingDiff = teamRating - opponentRating + homeAdvantage;
+  return normalCDF(ratingDiff, 0, 13.5);
+}
+
+// 🔧 ALSO ADD this helper function if you don't already have it
+// (Add this near your existing moneylineToProbability function)
+
+function moneylineToProbability(moneyline) {
+  if (!moneyline || moneyline === null) return null;
+  
+  if (moneyline > 0) {
+    return 1 / (moneyline / 100 + 1);
+  } else {
+    return 1 / (1 + 100 / Math.abs(moneyline));
+  }
+}
+
+// API Routes
+
+// Get power rankings - SIMPLIFIED for new database structure
+app.get('/api/power-rankings', async (req, res) => {
+  try {
+    const season = parseInt(req.query.season) || 2025;
+    
+    console.log(`Fetching power rankings for ${season} season`);
+    
+    const result = await pool.query(`
+  SELECT 
+    tpr.team_name,
+    tpr.power_rating,
+    tpr.offense_rating,
+    tpr.defense_rating,
+    tpr.season,
+    t.school,
+    t.mascot,
+    t.conference,
+    t.classification,
+    t.logo_url,
+    t.color,
+    t.alt_color,
+    COALESCE(sos.sos_overall, 0) as strength_of_schedule,
+    COALESCE(sos.sos_rank, 999) as sos_rank
+  FROM team_power_ratings tpr
+  LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name))
+  LEFT JOIN strength_of_schedule sos ON LOWER(TRIM(sos.team_name)) = LOWER(TRIM(tpr.team_name))
+    AND sos.season = tpr.season
+  WHERE tpr.power_rating IS NOT NULL 
+    AND tpr.season = $1
+  ORDER BY tpr.power_rating DESC
+`, [season]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: `No power rankings found for ${season} season`,
+        availableSeasons: await getAvailableSeasons(pool)
+      });
+    }
+    
+    // Calculate rankings
+    const sortedByPower = [...result.rows].sort((a, b) => b.power_rating - a.power_rating);
+    const sortedByOffense = [...result.rows].sort((a, b) => b.offense_rating - a.offense_rating);
+    const sortedByDefense = [...result.rows].sort((a, b) => b.defense_rating - a.defense_rating);
+    
+    const teamsWithRanks = result.rows.map(team => {
+      const powerRank = sortedByPower.findIndex(t => t.team_name === team.team_name) + 1;
+      const offenseRank = sortedByOffense.findIndex(t => t.team_name === team.team_name) + 1;
+      const defenseRank = sortedByDefense.findIndex(t => t.team_name === team.team_name) + 1;
+      
+      return {
+        team_name: team.team_name,
+        teamName: team.team_name,
+        power_rating: team.power_rating,
+        powerRating: team.power_rating,
+        offense_rating: team.offense_rating,
+        offenseRating: team.offense_rating,
+        defense_rating: team.defense_rating,
+        defenseRating: team.defense_rating,
+        season: team.season,
+        conference: team.conference || 'Unknown',
+        classification: team.classification || 'FBS',
+        logo: team.logo_url || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
+        abbreviation: team.school?.substring(0, 4).toUpperCase() || team.team_name?.substring(0, 4).toUpperCase(),
+        power_rank: powerRank,
+        powerRank: powerRank,
+        offense_rank: offenseRank,
+        offenseRank: offenseRank,
+        defense_rank: defenseRank,
+        defenseRank: defenseRank,
+        primary_color: team.color,
+        secondary_color: team.alt_color
+      };
+    }).sort((a, b) => b.power_rating - a.power_rating);
+    
+    console.log(`Returning ${teamsWithRanks.length} teams for ${season} season`);
+    
+    res.json({
+      season: season,
+      teams: teamsWithRanks,
+      totalTeams: teamsWithRanks.length
+    });
+  } catch (err) {
+    console.error('Error fetching power rankings:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Helper function to get available seasons
+async function getAvailableSeasons(pool) {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT season 
+      FROM team_power_ratings 
+      WHERE season IS NOT NULL 
+      ORDER BY season DESC
+    `);
+    return result.rows.map(row => row.season);
+  } catch (err) {
+    console.error('Error fetching available seasons:', err);
+    return [];
+  }
+}
+
+// Get available seasons endpoint
+app.get('/api/available-seasons', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT season 
+      FROM team_power_ratings 
+      WHERE season IS NOT NULL 
+      ORDER BY season DESC
+    `);
+    const seasons = result.rows.map(row => row.season);
+    res.json({ seasons });
+  } catch (err) {
+    console.error('Error fetching available seasons:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Individual team endpoint - SIMPLIFIED
+app.get('/api/teams/:teamName', async (req, res) => {
+  try {
+    const teamName = decodeURIComponent(req.params.teamName);
+    const season = parseInt(req.query.season) || 2025;
+    
+    console.log(`🔍 Looking for team: "${teamName}" for ${season} season`);
+    
+    const result = await pool.query(`
+      SELECT 
+        t.*,
+        tpr.power_rating,
+        tpr.offense_rating,
+        tpr.defense_rating,
+        tpr.season
+      FROM teams t
+      LEFT JOIN team_power_ratings tpr ON LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name))
+        AND tpr.season = $2
+      WHERE LOWER(TRIM(t.school)) = LOWER(TRIM($1))
+      LIMIT 1
+    `, [teamName, season]);
+    
+    if (result.rows.length === 0) {
+      console.log(`❌ Team not found: "${teamName}"`);
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    const team = result.rows[0];
+    
+    // Calculate ranks by getting all teams for this season and ranking them
+    const allTeamsResult = await pool.query(`
+      SELECT team_name, power_rating, offense_rating, defense_rating
+      FROM team_power_ratings 
+      WHERE season = $1 AND power_rating IS NOT NULL
+      ORDER BY power_rating DESC
+    `, [season]);
+    
+    const allTeams = allTeamsResult.rows;
+    const powerRank = allTeams.findIndex(t => t.team_name === team.school) + 1;
+    const offenseRank = [...allTeams].sort((a, b) => b.offense_rating - a.offense_rating)
+      .findIndex(t => t.team_name === team.school) + 1;
+    const defenseRank = [...allTeams].sort((a, b) => b.defense_rating - a.defense_rating)
+      .findIndex(t => t.team_name === team.school) + 1;
+    
+    console.log(`✅ Found team: "${team.school}" for ${season} season`);
+    
+    res.json({
+      team_name: team.school,
+      power_rating: team.power_rating,
+      offense_rating: team.offense_rating,
+      defense_rating: team.defense_rating,
+      season: team.season,
+      conference: team.conference,
+      classification: team.classification || 'FBS',
+      logo: team.logo_url || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
+      primary_color: team.color,
+      secondary_color: team.alt_color,
+      power_rank: powerRank || null,
+      offense_rank: offenseRank || null,
+      defense_rank: defenseRank || null,
+      mascot: team.mascot
+    });
+  } catch (err) {
+    console.error('Error fetching team:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get team's season stats
+app.get('/api/teams/:teamName/stats', async (req, res) => {
+  try {
+    const teamName = decodeURIComponent(req.params.teamName);
+    const season = parseInt(req.query.season) || 2024;
+    
+    console.log(`🔍 Fetching stats for: "${teamName}", season ${season}`);
+    
+    const query = `
+      SELECT 
+        ass.season,
+        ass.team,
+        ass.conference,
+        
+        -- Calculate games played for this team
+        (SELECT COUNT(*) FROM games g 
+         WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+         AND g.season = ass.season 
+         AND g.completed = true) as games_played,
+        
+        -- Per-game stats (divide by games played)
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.offense_plays / (SELECT COUNT(*) FROM games g 
+                                   WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                   AND g.season = ass.season 
+                                   AND g.completed = true)
+          ELSE ass.offense_plays
+        END as offense_plays_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.defense_plays / (SELECT COUNT(*) FROM games g 
+                                   WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                   AND g.season = ass.season 
+                                   AND g.completed = true)
+          ELSE ass.defense_plays
+        END as defense_plays_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.offense_drives / (SELECT COUNT(*) FROM games g 
+                                    WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                    AND g.season = ass.season 
+                                    AND g.completed = true)
+          ELSE ass.offense_drives
+        END as offense_drives_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.defense_drives / (SELECT COUNT(*) FROM games g 
+                                    WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                    AND g.season = ass.season 
+                                    AND g.completed = true)
+          ELSE ass.defense_drives
+        END as defense_drives_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.offense_total_opportunities / (SELECT COUNT(*) FROM games g 
+                                                 WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                                 AND g.season = ass.season 
+                                                 AND g.completed = true)
+          ELSE ass.offense_total_opportunities
+        END as offense_total_opportunities_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.defense_total_opportunities / (SELECT COUNT(*) FROM games g 
+                                                 WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                                 AND g.season = ass.season 
+                                                 AND g.completed = true)
+          ELSE ass.defense_total_opportunities
+        END as defense_total_opportunities_per_game,
+        
+        -- Original stats (not per-game)
+        ass.offense_plays,
+        ass.defense_plays,
+        ass.offense_drives,
+        ass.defense_drives,
+        ass.offense_total_opportunities,
+        ass.defense_total_opportunities,
+        ass.offense_points_per_opportunity,
+        ass.defense_points_per_opportunity,
+        
+        -- Core efficiency metrics (already per-play/percentage)
+        ass.offense_ppa,
+        ass.defense_ppa,
+        ass.offense_success_rate,
+        ass.defense_success_rate,
+        ass.offense_explosiveness,
+        ass.defense_explosiveness,
+        ass.offense_power_success,
+        ass.defense_power_success,
+        ass.offense_havoc_total,
+        ass.defense_havoc_total,
+        
+        -- Passing stats
+        ass.offense_passing_plays_rate,
+        ass.defense_passing_plays_rate,
+        ass.offense_passing_plays_ppa,
+        ass.defense_passing_plays_ppa,
+        ass.offense_passing_plays_success_rate,
+        ass.defense_passing_plays_success_rate,
+        ass.offense_passing_plays_explosiveness,
+        ass.defense_passing_plays_explosiveness,
+        
+        -- Rushing stats
+        ass.offense_rushing_plays_rate,
+        ass.defense_rushing_plays_rate,
+        ass.offense_rushing_plays_ppa,
+        ass.defense_rushing_plays_ppa,
+        ass.offense_rushing_plays_success_rate,
+        ass.defense_rushing_plays_success_rate,
+        ass.offense_rushing_plays_explosiveness,
+        ass.defense_rushing_plays_explosiveness,
+        
+        -- Line metrics
+        ass.offense_stuff_rate,
+        ass.defense_stuff_rate,
+        ass.offense_line_yards,
+        ass.defense_line_yards,
+        ass.offense_second_level_yards,
+        ass.defense_second_level_yards,
+        ass.offense_open_field_yards,
+        ass.defense_open_field_yards
+        
+      FROM advanced_season_stats ass
+      WHERE LOWER(TRIM(ass.team)) = LOWER(TRIM($1)) 
+        AND ass.season = $2
+      LIMIT 1
+    `;
+    
+    const result = await pool.query(query, [teamName, season]);
+    
+    if (result.rows.length === 0) {
+      console.log(`❌ No stats found for "${teamName}" in season ${season}`);
+      return res.status(404).json({ error: `No stats found for ${teamName} in ${season}` });
+    }
+    
+    const teamData = result.rows[0];
+    console.log(`✅ Found stats for "${teamName}":`, {
+      team: teamData.team,
+      season: teamData.season,
+      games_played: teamData.games_played
+    });
+    
+    res.json(teamData);
+  } catch (err) {
+    console.error('Error fetching team stats:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Team Games Endpoint
+app.get('/api/teams/:teamName/games', async (req, res) => {
+  try {
+    const { teamName } = req.params;
+    const season = parseInt(req.query.season) || 2024;
+    
+    console.log(`🏈 Getting games for team: "${teamName}", season: ${season}`);
+    
+    // Get the actual team name from teams table (case-insensitive)
+    const teamResult = await pool.query(`
+      SELECT school, conference, classification, logo_url
+      FROM teams 
+      WHERE LOWER(school) = LOWER($1)
+      LIMIT 1
+    `, [teamName]);
+    
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Team not found',
+        requested_team: teamName
+      });
+    }
+    
+    const actualTeamName = teamResult.rows[0].school;
+    console.log(`📝 Found team: "${actualTeamName}"`);
+    
+    // Get games using the actual team name
+    const gamesResult = await pool.query(`
+      SELECT 
+        g.*,
+        CASE 
+          WHEN g.home_team = $1 THEN g.away_team
+          ELSE g.home_team
+        END as opponent,
+        CASE 
+          WHEN g.home_team = $1 THEN 'home'
+          WHEN g.neutral_site = true THEN 'neutral'
+          ELSE 'away'
+        END as venue,
+        -- Get opponent info
+        opp_teams.conference as opponent_conference,
+        opp_teams.logo_url as opponent_logo,
+        -- Get opponent ratings if available
+        opp_ratings.power_rating as opponent_rating
+      FROM games g
+      LEFT JOIN teams opp_teams ON opp_teams.school = CASE 
+        WHEN g.home_team = $1 THEN g.away_team
+        ELSE g.home_team
+      END
+      LEFT JOIN team_power_ratings opp_ratings ON opp_ratings.team_name = CASE 
+        WHEN g.home_team = $1 THEN g.away_team
+        ELSE g.home_team
+      END AND opp_ratings.season = $2
+      WHERE (g.home_team = $1 OR g.away_team = $1) 
+        AND g.season = $2
+      ORDER BY g.week, g.start_date
+    `, [actualTeamName, season]);
+    
+    console.log(`📊 Found ${gamesResult.rows.length} games for ${actualTeamName} in ${season}`);
+    
+    res.json({
+      team: actualTeamName,
+      season: season,
+      total_games: gamesResult.rows.length,
+      games: gamesResult.rows.map(game => ({
+        ...game,
+        team_score: game.home_team === actualTeamName ? game.home_points : game.away_points,
+        opponent_score: game.home_team === actualTeamName ? game.away_points : game.home_points,
+        result: game.completed && game.home_points !== null && game.away_points !== null ? 
+          (game.home_team === actualTeamName ? 
+            (game.home_points > game.away_points ? 'W' : 
+             game.home_points < game.away_points ? 'L' : 'T') :
+            (game.away_points > game.home_points ? 'W' : 
+             game.away_points < game.home_points ? 'L' : 'T')
+          ) : null
+      }))
+    });
+    
+  } catch (err) {
+    console.error('❌ Error getting team games:', err);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: err.message 
+    });
+  }
+});
+
+// REPLACE your existing /api/leaderboards/passing/:season endpoint with this FIXED version:
+// REPLACE your current passing endpoint with this COMPLETE FEATURED version:
+
+app.get('/api/leaderboards/passing/:season', async (req, res) => {
+  try {
+    const { season } = req.params;
+    
+    // Map frontend parameters to backend parameters
+    const { 
+      side = 'offense',
+      per_game = 'false',
+      regular_season_only = 'false',
+      conference_only = 'false',
+      conference = null
+    } = req.query;
+    
+    // Convert frontend params to backend logic
+    const stat_type = per_game === 'true' ? 'per_game' : 'total';
+    const season_type = regular_season_only === 'true' ? 'regular' : 'all';
+    
+    console.log(`🏈 Complete passing stats - Season: ${season}, Side: ${side}, Type: ${stat_type}, Season: ${season_type}`);
+    const startTime = Date.now();
+    
+    let query, queryParams;
+    
+    if (side === 'offense') {
+      // OFFENSE STATS - Team's own passing
+      query = `
+        WITH unique_offense_games AS (
+          SELECT DISTINCT
+            gts.team,
+            gts.game_id,
+            gts.completions,
+            gts.passing_attempts,
+            gts.net_passing_yards,
+            gts.passing_tds,
+            gts.interceptions_thrown as interceptions,
+            COALESCE(gts.sacks, 0) as sacks,
+            COALESCE(gts.qb_hurries, 0) as qb_hurries,
+            g.season_type,
+            g.conference_game
+          FROM game_team_stats_new gts
+          INNER JOIN games g ON gts.game_id = g.id
+          WHERE gts.season = $1 
+            AND g.completed = true
+      `;
+      queryParams = [season];
+      
+      // Add season type filter
+      if (season_type === 'regular') {
+        query += ` AND g.season_type = 'regular'`;
+      }
+      
+      // Add conference filter
+      if (conference_only === 'true') {
+        query += ` AND g.conference_game = true`;
+      }
+      
+      query += `
+        ),
+        offense_totals AS (
+          SELECT 
+            uog.team,
+            COUNT(*) as games_played,
+            SUM(uog.completions) as total_completions,
+            SUM(uog.passing_attempts) as total_attempts,
+            SUM(uog.net_passing_yards) as total_yards,
+            SUM(uog.passing_tds) as total_tds,
+            SUM(uog.interceptions) as total_interceptions,
+            SUM(uog.sacks) as total_sacks,
+            SUM(uog.qb_hurries) as total_hurries,
+            
+            -- Calculate advanced metrics
+            CASE 
+              WHEN SUM(uog.passing_attempts) > 0 
+              THEN ROUND((SUM(uog.completions)::decimal / SUM(uog.passing_attempts)) * 100, 1)
+              ELSE 0 
+            END as completion_percentage,
+            
+            CASE 
+              WHEN SUM(uog.passing_attempts) > 0 
+              THEN ROUND(SUM(uog.net_passing_yards)::decimal / SUM(uog.passing_attempts), 1)
+              ELSE 0 
+            END as yards_per_attempt,
+            
+            CASE 
+              WHEN SUM(uog.completions) > 0 
+              THEN ROUND(SUM(uog.net_passing_yards)::decimal / SUM(uog.completions), 1)
+              ELSE 0 
+            END as yards_per_completion,
+            
+            -- Per-game calculations
+            ROUND(SUM(uog.completions)::decimal / COUNT(*), 1) as completions_per_game,
+            ROUND(SUM(uog.passing_attempts)::decimal / COUNT(*), 1) as attempts_per_game,
+            ROUND(SUM(uog.net_passing_yards)::decimal / COUNT(*), 1) as yards_per_game,
+            ROUND(SUM(uog.passing_tds)::decimal / COUNT(*), 1) as tds_per_game,
+            ROUND(SUM(uog.interceptions)::decimal / COUNT(*), 1) as interceptions_per_game,
+            ROUND(SUM(uog.sacks)::decimal / COUNT(*), 1) as sacks_per_game,
+            ROUND(SUM(uog.qb_hurries)::decimal / COUNT(*), 1) as hurries_per_game,
+            
+            -- Efficiency ratios
+            CASE 
+              WHEN SUM(uog.interceptions) > 0 
+              THEN ROUND(SUM(uog.passing_tds)::decimal / SUM(uog.interceptions), 2)
+              ELSE SUM(uog.passing_tds)
+            END as td_int_ratio,
+            
+            CASE 
+              WHEN COUNT(*) > 0 
+              THEN ROUND((SUM(uog.sacks)::decimal + SUM(uog.qb_hurries)) / COUNT(*), 1)
+              ELSE 0 
+            END as pressure_per_game
+            
+          FROM unique_offense_games uog
+          GROUP BY uog.team
+          HAVING COUNT(*) >= 8  -- Teams must have played at least 8 games
+        )
+        SELECT 
+          ot.team as team_name,
+          t.logo_url,
+          t.conference,
+          t.classification,
+          ot.games_played,
+          ot.total_completions,
+          ot.total_attempts,
+          ot.total_yards,
+          ot.total_tds,
+          ot.total_interceptions,
+          ot.total_sacks,
+          ot.total_hurries,
+          ot.completion_percentage,
+          ot.yards_per_attempt,
+          ot.yards_per_completion,
+          ot.completions_per_game,
+          ot.attempts_per_game,
+          ot.yards_per_game,
+          ot.tds_per_game,
+          ot.interceptions_per_game,
+          ot.sacks_per_game,
+          ot.hurries_per_game,
+          ot.td_int_ratio,
+          ot.pressure_per_game
+        FROM offense_totals ot
+        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(ot.team))
+        WHERE t.classification = 'fbs'
+      `;
+      
+    } else {
+      // DEFENSE STATS - Opponent passing allowed
+      query = `
+        WITH unique_defense_games AS (
+          SELECT DISTINCT
+            CASE 
+              WHEN g.home_team = gts.team THEN g.away_team
+              ELSE g.home_team
+            END as defense_team,
+            gts.game_id,
+            gts.completions,
+            gts.passing_attempts,
+            gts.net_passing_yards,
+            gts.passing_tds,
+            gts.interceptions_thrown as interceptions,
+            COALESCE(gts.sacks, 0) as sacks,
+            COALESCE(gts.qb_hurries, 0) as qb_hurries,
+            g.season_type,
+            g.conference_game
+          FROM game_team_stats_new gts
+          INNER JOIN games g ON gts.game_id = g.id
+          WHERE gts.season = $1 
+            AND g.completed = true
+      `;
+      queryParams = [season];
+      
+      // Add season type filter
+      if (season_type === 'regular') {
+        query += ` AND g.season_type = 'regular'`;
+      }
+      
+      // Add conference filter
+      if (conference_only === 'true') {
+        query += ` AND g.conference_game = true`;
+      }
+      
+      query += `
+        ),
+        defense_totals AS (
+          SELECT 
+            udg.defense_team as team,
+            COUNT(*) as games_played,
+            SUM(udg.completions) as total_completions_allowed,
+            SUM(udg.passing_attempts) as total_attempts_allowed,
+            SUM(udg.net_passing_yards) as total_yards_allowed,
+            SUM(udg.passing_tds) as total_tds_allowed,
+            SUM(udg.interceptions) as total_interceptions_forced,
+            SUM(udg.sacks) as total_sacks_allowed,
+            SUM(udg.qb_hurries) as total_hurries_allowed,
+            
+            -- Calculate defensive metrics (allowing)
+            CASE 
+              WHEN SUM(udg.passing_attempts) > 0 
+              THEN ROUND((SUM(udg.completions)::decimal / SUM(udg.passing_attempts)) * 100, 1)
+              ELSE 0 
+            END as completion_percentage_allowed,
+            
+            CASE 
+              WHEN SUM(udg.passing_attempts) > 0 
+              THEN ROUND(SUM(udg.net_passing_yards)::decimal / SUM(udg.passing_attempts), 1)
+              ELSE 0 
+            END as yards_per_attempt_allowed,
+            
+            CASE 
+              WHEN SUM(udg.completions) > 0 
+              THEN ROUND(SUM(udg.net_passing_yards)::decimal / SUM(udg.completions), 1)
+              ELSE 0 
+            END as yards_per_completion_allowed,
+            
+            -- Per-game calculations (defense perspective)
+            ROUND(SUM(udg.completions)::decimal / COUNT(*), 1) as completions_per_game_allowed,
+            ROUND(SUM(udg.passing_attempts)::decimal / COUNT(*), 1) as attempts_per_game_allowed,
+            ROUND(SUM(udg.net_passing_yards)::decimal / COUNT(*), 1) as yards_per_game_allowed,
+            ROUND(SUM(udg.passing_tds)::decimal / COUNT(*), 1) as tds_per_game_allowed,
+            ROUND(SUM(udg.interceptions)::decimal / COUNT(*), 1) as interceptions_per_game_forced,
+            ROUND(SUM(udg.sacks)::decimal / COUNT(*), 1) as sacks_per_game_allowed,
+            ROUND(SUM(udg.qb_hurries)::decimal / COUNT(*), 1) as hurries_per_game_allowed,
+            
+            -- Defensive efficiency ratios
+            CASE 
+              WHEN SUM(udg.passing_tds) > 0 
+              THEN ROUND(SUM(udg.interceptions)::decimal / SUM(udg.passing_tds), 2)
+              ELSE SUM(udg.interceptions)
+            END as int_td_ratio,
+            
+            CASE 
+              WHEN COUNT(*) > 0 
+              THEN ROUND((SUM(udg.sacks)::decimal + SUM(udg.qb_hurries)) / COUNT(*), 1)
+              ELSE 0 
+            END as pressure_per_game_generated
+            
+          FROM unique_defense_games udg
+          GROUP BY udg.defense_team
+          HAVING COUNT(*) >= 8  -- Teams must have played at least 8 games
+        )
+        SELECT 
+          dt.team as team_name,
+          t.logo_url,
+          t.conference,
+          t.classification,
+          dt.games_played,
+          dt.total_completions_allowed as total_completions,
+          dt.total_attempts_allowed as total_attempts,
+          dt.total_yards_allowed as total_yards,
+          dt.total_tds_allowed as total_tds,
+          dt.total_interceptions_forced as total_interceptions,
+          dt.total_sacks_allowed as total_sacks,
+          dt.total_hurries_allowed as total_hurries,
+          dt.completion_percentage_allowed as completion_percentage,
+          dt.yards_per_attempt_allowed as yards_per_attempt,
+          dt.yards_per_completion_allowed as yards_per_completion,
+          dt.completions_per_game_allowed as completions_per_game,
+          dt.attempts_per_game_allowed as attempts_per_game,
+          dt.yards_per_game_allowed as yards_per_game,
+          dt.tds_per_game_allowed as tds_per_game,
+          dt.interceptions_per_game_forced as interceptions_per_game,
+          dt.sacks_per_game_allowed as sacks_per_game,
+          dt.hurries_per_game_allowed as hurries_per_game,
+          dt.int_td_ratio as td_int_ratio,
+          dt.pressure_per_game_generated as pressure_per_game
+        FROM defense_totals dt
+        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(dt.team))
+        WHERE t.classification = 'fbs'
+      `;
+    }
+    
+    // Add conference filter
+    if (conference && conference !== 'all') {
+      query += ` AND t.conference = $${queryParams.length + 1}`;
+      queryParams.push(conference);
+    }
+    
+    // Add ordering based on stat_type and side
+    if (side === 'offense') {
+      query += stat_type === 'per_game' ? 
+        ` ORDER BY yards_per_game DESC` : 
+        ` ORDER BY total_yards DESC`;
+    } else {
+      query += stat_type === 'per_game' ? 
+        ` ORDER BY yards_per_game ASC` : 
+        ` ORDER BY total_yards ASC`;
+    }
+    
+    console.log(`🔍 Executing complete query with ${queryParams.length} parameters`);
+    
+    const result = await pool.query(query, queryParams);
+    
+    // Process results with full feature set
+    const teams = result.rows.map(team => {
+      const processedTeam = {
+        ...team,
+        // Convert string numbers to actual numbers
+        games_played: parseInt(team.games_played),
+        total_completions: parseInt(team.total_completions),
+        total_attempts: parseInt(team.total_attempts),
+        total_yards: parseInt(team.total_yards),
+        total_tds: parseInt(team.total_tds),
+        total_interceptions: parseInt(team.total_interceptions),
+        total_sacks: parseInt(team.total_sacks),
+        total_hurries: parseInt(team.total_hurries),
+        completion_percentage: parseFloat(team.completion_percentage),
+        yards_per_attempt: parseFloat(team.yards_per_attempt),
+        yards_per_completion: parseFloat(team.yards_per_completion || 0),
+        completions_per_game: parseFloat(team.completions_per_game),
+        attempts_per_game: parseFloat(team.attempts_per_game),
+        yards_per_game: parseFloat(team.yards_per_game),
+        tds_per_game: parseFloat(team.tds_per_game),
+        interceptions_per_game: parseFloat(team.interceptions_per_game),
+        sacks_per_game: parseFloat(team.sacks_per_game),
+        hurries_per_game: parseFloat(team.hurries_per_game),
+        td_int_ratio: parseFloat(team.td_int_ratio || 0),
+        pressure_per_game: parseFloat(team.pressure_per_game || 0)
+      };
+      
+      // Set display values based on stat_type
+      if (stat_type === 'per_game') {
+        processedTeam.display_completions = processedTeam.completions_per_game;
+        processedTeam.display_attempts = processedTeam.attempts_per_game;
+        processedTeam.display_yards = processedTeam.yards_per_game;
+        processedTeam.display_tds = processedTeam.tds_per_game;
+        processedTeam.display_interceptions = processedTeam.interceptions_per_game;
+        processedTeam.display_sacks = processedTeam.sacks_per_game;
+        processedTeam.display_hurries = processedTeam.hurries_per_game;
+      } else {
+        processedTeam.display_completions = processedTeam.total_completions;
+        processedTeam.display_attempts = processedTeam.total_attempts;
+        processedTeam.display_yards = processedTeam.total_yards;
+        processedTeam.display_tds = processedTeam.total_tds;
+        processedTeam.display_interceptions = processedTeam.total_interceptions;
+        processedTeam.display_sacks = processedTeam.total_sacks;
+        processedTeam.display_hurries = processedTeam.total_hurries;
+      }
+      
+      return processedTeam;
+    });
+    
+    // Add comprehensive rankings and percentiles
+    const addRankingsAndPercentiles = (teams, statField, ascending = false) => {
+      // Determine sort order based on side and stat type
+      let sortOrder = ascending;
+      if (side === 'defense') {
+        // For defense, lower numbers are better (except interceptions/sacks/hurries)
+        if (!['interceptions', 'sacks', 'hurries', 'pressure', 'td_int_ratio'].some(good => statField.includes(good))) {
+          sortOrder = true; // ascending for defense on most stats
+        }
+      }
+      
+      const sorted = [...teams].sort((a, b) => 
+        sortOrder ? a[statField] - b[statField] : b[statField] - a[statField]
+      );
+      
+      teams.forEach(team => {
+        const rank = sorted.findIndex(t => t.team_name === team.team_name) + 1;
+        const percentile = ((teams.length - rank + 1) / teams.length * 100);
+        
+        team[`${statField}_rank`] = rank;
+        team[`${statField}_percentile`] = parseFloat(percentile.toFixed(1));
+      });
+    };
+    
+    // Add rankings for all stats
+    const statsToRank = [
+      'display_completions', 'display_attempts', 'display_yards', 'display_tds',
+      'completion_percentage', 'yards_per_attempt', 'yards_per_completion',
+      'td_int_ratio', 'pressure_per_game'
+    ];
+    
+    statsToRank.forEach(stat => {
+      addRankingsAndPercentiles(teams, stat);
+    });
+    
+    // Special handling for "bad" stats
+    if (side === 'offense') {
+      addRankingsAndPercentiles(teams, 'display_interceptions', true); // ascending for offense
+      addRankingsAndPercentiles(teams, 'display_sacks', true);
+      addRankingsAndPercentiles(teams, 'display_hurries', true);
+    } else {
+      addRankingsAndPercentiles(teams, 'display_interceptions'); // descending for defense
+      addRankingsAndPercentiles(teams, 'display_sacks');
+      addRankingsAndPercentiles(teams, 'display_hurries');
+    }
+    
+    // Add overall rank (based on primary sort)
+    teams.forEach((team, index) => {
+      team.overall_rank = index + 1;
+    });
+    
+    const executionTime = Date.now() - startTime;
+    console.log(`✅ Complete passing stats: ${teams.length} FBS teams in ${executionTime}ms`);
+    
+    // Debug verification
+    const sampleTeam = teams.find(t => t.team_name === 'Ole Miss');
+    if (sampleTeam) {
+      console.log(`✅ Ole Miss verification: ${sampleTeam.display_completions} completions, ${sampleTeam.games_played} games, ${sampleTeam.yards_per_attempt} YPA`);
+    }
+    
+    res.json({
+      teams: teams,
+      metadata: {
+        season: parseInt(season),
+        side: side,
+        stat_type: stat_type,
+        season_type: season_type,
+        conference_only: conference_only === 'true',
+        conference_filter: conference,
+        total_teams: teams.length,
+        execution_time_ms: executionTime,
+        generated_at: new Date().toISOString(),
+        features: [
+          'Complete rankings and percentiles',
+          'Advanced efficiency metrics',
+          'TD/INT ratios',
+          'Pressure statistics',
+          'Yards per completion',
+          'FBS teams only',
+          'Proper offense/defense differentiation'
+        ]
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Complete passing stats error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch complete passing stats', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// 🔧 STEP 2: Remove debug info from TeamPage component
+
+// In your TeamPage.js, find and DELETE these lines (around where you have the debug component):
+
+/* DELETE THIS SECTION:
+        // DEBUG INFO - Temporary 
+        <GamesDebugInfo games={games} />
+*/
+
+// Also DELETE the GamesDebugInfo component definition:
+
+/* DELETE THIS ENTIRE COMPONENT:
+  const GamesDebugInfo = ({ games }) => {
+    if (!games) return <div>Games is null/undefined</div>;
+    if (!Array.isArray(games)) return <div>Games is not an array: {typeof games}</div>;
+    
+    return (
+      <div style={{ 
+        backgroundColor: '#f0f0f0', 
+        padding: '10px', 
+        margin: '10px 0',
+        borderRadius: '4px',
+        fontFamily: 'monospace'
+      }}>
+        <strong>🐛 DEBUG INFO:</strong><br/>
+        Games array length: {games.length}<br/>
+        {games.length > 0 && (
+          <>
+            First game keys: {Object.keys(games[0]).join(', ')}<br/>
+            First game: {JSON.stringify(games[0], null, 2).substring(0, 200)}...
+          </>
+        )}
+      </div>
+    );
+  };
+*/
+
+// 🔧 STEP 3: Test if you have the required tables
+
+// Add this temporary debug endpoint to check your database structure:
+app.get('/api/debug-tables', async (req, res) => {
+  try {
+    // Check what tables exist
+    const tablesResult = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      ORDER BY table_name
+    `);
+    
+    const tables = tablesResult.rows.map(row => row.table_name);
+    
+    // Check if PPA tables exist and have data
+    let ppaTableInfo = {};
+    if (tables.includes('advanced_game_stats')) {
+      const ppaCount = await pool.query(`
+        SELECT COUNT(*) as count, COUNT(offense_ppa) as ppa_count
+        FROM advanced_game_stats 
+        WHERE season = 2024
+      `);
+      ppaTableInfo.advanced_game_stats = ppaCount.rows[0];
+    }
+    
+    // Check betting lines table
+    let bettingTableInfo = {};
+    if (tables.includes('game_betting_lines')) {
+      const bettingCount = await pool.query(`
+        SELECT COUNT(*) as count, COUNT(DISTINCT provider) as providers
+        FROM game_betting_lines
+      `);
+      bettingTableInfo.game_betting_lines = bettingCount.rows[0];
+    }
+    
+    res.json({
+      all_tables: tables,
+      has_advanced_game_stats: tables.includes('advanced_game_stats'),
+      has_game_betting_lines: tables.includes('game_betting_lines'),
+      ppa_data: ppaTableInfo,
+      betting_data: bettingTableInfo
+    });
+    
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+app.get('/api/all-advanced-stats/:season', async (req, res) => {
+  try {
+    const { season } = req.params;
+    
+    console.log(`🔍 Fetching all advanced stats with per-game calculations for season ${season}`);
+    
+    const query = `
+      SELECT DISTINCT ON (ass.team)
+        ass.team as team_name,
+        ass.season,
+        
+        -- Calculate games played for each team
+        (SELECT COUNT(*) FROM games g 
+         WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+         AND g.season = ass.season 
+         AND g.completed = true) as games_played,
+        
+        -- Per-game stats (divide by games played)
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.offense_plays / (SELECT COUNT(*) FROM games g 
+                                   WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                   AND g.season = ass.season 
+                                   AND g.completed = true)
+          ELSE ass.offense_plays
+        END as offense_plays_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.defense_plays / (SELECT COUNT(*) FROM games g 
+                                   WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                   AND g.season = ass.season 
+                                   AND g.completed = true)
+          ELSE ass.defense_plays
+        END as defense_plays_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.offense_drives / (SELECT COUNT(*) FROM games g 
+                                    WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                    AND g.season = ass.season 
+                                    AND g.completed = true)
+          ELSE ass.offense_drives
+        END as offense_drives_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.defense_drives / (SELECT COUNT(*) FROM games g 
+                                    WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                    AND g.season = ass.season 
+                                    AND g.completed = true)
+          ELSE ass.defense_drives
+        END as defense_drives_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.offense_total_opportunities / (SELECT COUNT(*) FROM games g 
+                                                 WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                                 AND g.season = ass.season 
+                                                 AND g.completed = true)
+          ELSE ass.offense_total_opportunities
+        END as offense_total_opportunities_per_game,
+        
+        CASE 
+          WHEN (SELECT COUNT(*) FROM games g 
+                WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                AND g.season = ass.season 
+                AND g.completed = true) > 0 
+          THEN ass.defense_total_opportunities / (SELECT COUNT(*) FROM games g 
+                                                 WHERE (g.home_team = ass.team OR g.away_team = ass.team) 
+                                                 AND g.season = ass.season 
+                                                 AND g.completed = true)
+          ELSE ass.defense_total_opportunities
+        END as defense_total_opportunities_per_game,
+        
+        -- Original totals (for reference)
+        ass.offense_plays,
+        ass.defense_plays,
+        ass.offense_drives,
+        ass.defense_drives,
+        ass.offense_total_opportunities,
+        ass.defense_total_opportunities,
+        ass.offense_points_per_opportunity,
+        ass.defense_points_per_opportunity,
+        
+        -- Core efficiency metrics (already per-play/percentage)
+        ass.offense_ppa,
+        ass.defense_ppa,
+        ass.offense_success_rate,
+        ass.defense_success_rate,
+        ass.offense_explosiveness,
+        ass.defense_explosiveness,
+        ass.offense_power_success,
+        ass.defense_power_success,
+        ass.offense_havoc_total,
+        ass.defense_havoc_total,
+        
+        -- Passing stats
+        ass.offense_passing_plays_rate,
+        ass.defense_passing_plays_rate,
+        ass.offense_passing_plays_ppa,
+        ass.defense_passing_plays_ppa,
+        ass.offense_passing_plays_success_rate,
+        ass.defense_passing_plays_success_rate,
+        ass.offense_passing_plays_explosiveness,
+        ass.defense_passing_plays_explosiveness,
+        
+        -- Rushing stats
+        ass.offense_rushing_plays_rate,
+        ass.defense_rushing_plays_rate,
+        ass.offense_rushing_plays_ppa,
+        ass.defense_rushing_plays_ppa,
+        ass.offense_rushing_plays_success_rate,
+        ass.defense_rushing_plays_success_rate,
+        ass.offense_rushing_plays_explosiveness,
+        ass.defense_rushing_plays_explosiveness,
+        
+        -- Line metrics
+        ass.offense_stuff_rate,
+        ass.defense_stuff_rate,
+        ass.offense_line_yards,
+        ass.defense_line_yards,
+        ass.offense_second_level_yards,
+        ass.defense_second_level_yards,
+        ass.offense_open_field_yards,
+        ass.defense_open_field_yards
+        
+      FROM advanced_season_stats ass
+      WHERE ass.season = $1
+      ORDER BY ass.team, ass.season DESC
+    `;
+    
+    const result = await pool.query(query, [season]);
+    
+    console.log(`✅ Found ${result.rows.length} UNIQUE teams with per-game calculations for season ${season}`);
+    
+    res.json(result.rows);
+    
+  } catch (error) {
+    console.error('❌ Error fetching all advanced stats:', error);
+    res.status(500).json({ error: 'Failed to fetch advanced stats', details: error.message });
+  }
+});
+
+// Debug teams endpoint
+app.get('/api/debug-teams', async (req, res) => {
+  try {
+    const stats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_teams,
+        COUNT(CASE WHEN classification = 'fbs' THEN 1 END) as fbs_teams,
+        COUNT(CASE WHEN logo_url IS NOT NULL THEN 1 END) as teams_with_logos,
+        COUNT(CASE WHEN conference IS NOT NULL THEN 1 END) as teams_with_conference
+      FROM teams
+    `);
+    
+    const sampleTeams = await pool.query(`
+      SELECT school, mascot, conference, classification, logo_url 
+      FROM teams 
+      WHERE classification = 'fbs'
+      ORDER BY school 
+      LIMIT 5
+    `);
+    
+    const powerRatingsCount = await pool.query(`
+      SELECT COUNT(*) as teams_with_power_ratings
+      FROM team_power_ratings
+      WHERE power_rating IS NOT NULL
+    `);
+    
+    res.json({
+      database: process.env.DB_NAME || process.env.DB_DATABASE,
+      teamsTableStats: stats.rows[0],
+      powerRatingsCount: powerRatingsCount.rows[0],
+      sampleTeams: sampleTeams.rows
+    });
+  } catch (err) {
+    console.error('Error in debug:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'CFB API is running',
+    database: process.env.DB_NAME || process.env.DB_DATABASE,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Debug endpoint to check table structure
+app.get('/api/debug-columns', async (req, res) => {
+  try {
+    const columns = await pool.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'team_power_ratings'
+      ORDER BY ordinal_position
+    `);
+    
+    const sample = await pool.query('SELECT * FROM team_power_ratings LIMIT 1');
+    
+    res.json({
+      columns: columns.rows.map(col => col.column_name),
+      column_details: columns.rows,
+      sample_row: sample.rows[0] || null,
+      has_season_column: columns.rows.some(col => col.column_name === 'season'),
+      has_year_column: columns.rows.some(col => col.column_name === 'year')
+    });
+    
+  } catch (err) {
+    res.json({ 
+      error: err.message,
+      code: err.code
+    });
+  }
+});
+
+// Strength of Schedule Enhanced Endpoint
+app.get('/api/leaderboards/strength-of-schedule-enhanced/:season', async (req, res) => {
+  try {
+    const { season } = req.params;
+    const { 
+      conferenceOnly = 'false', 
+      includePostseason = 'false',
+      classification = 'fbs' 
+    } = req.query;
+    
+    console.log(`🔍 Calculating SOS for ${season}, classification: ${classification}`);
+    
+    // Get all teams with their power ratings for the season
+    const teamsQuery = `
+      SELECT DISTINCT
+        t.school as team,
+        t.conference,
+        t.classification,
+        t.logo_url,
+        t.abbreviation,
+        COALESCE(tpr.power_rating, 0) as team_rating
+      FROM teams t
+      LEFT JOIN team_power_ratings tpr ON LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name))
+        AND tpr.season = $1
+      WHERE t.classification = $2 OR $2 = 'all'
+      ORDER BY t.school
+    `;
+    
+    const teamsResult = await pool.query(teamsQuery, [season, classification]);
+    const teams = teamsResult.rows;
+    
+    console.log(`📊 Found ${teams.length} teams for ${classification} in ${season}`);
+    
+    if (teams.length === 0) {
+      return res.status(404).json({ 
+        error: `No teams found for ${classification} in ${season}` 
+      });
+    }
+    
+    // Calculate SOS for each team
+    const sosData = [];
+    
+    for (const team of teams) {
+      console.log(`⚙️ Calculating SOS for ${team.team}`);
+      
+      // Get all games for this team
+      let gamesQuery = `
+        SELECT 
+          g.*,
+          CASE 
+            WHEN g.home_team = $1 THEN g.away_team
+            ELSE g.home_team
+          END as opponent,
+          CASE 
+            WHEN g.home_team = $1 THEN 'home'
+            ELSE 'away'
+          END as venue
+        FROM games g
+        WHERE (g.home_team = $1 OR g.away_team = $1) 
+          AND g.season = $2
+      `;
+      
+      const queryParams = [team.team, season];
+      
+      // Add filters based on query parameters
+      if (conferenceOnly === 'true') {
+        gamesQuery += ` AND g.conference_game = true`;
+      }
+      
+      if (includePostseason === 'false') {
+        gamesQuery += ` AND g.season_type = 'regular'`;
+      }
+      
+      gamesQuery += ` ORDER BY g.week`;
+      
+      const gamesResult = await pool.query(gamesQuery, queryParams);
+      const games = gamesResult.rows;
+      
+      // Separate completed and future games
+      const completedGames = games.filter(g => g.completed === true);
+      const futureGames = games.filter(g => g.completed === false);
+      
+      // Calculate SOS for completed games (SOS Played)
+      let sosPlayed = 0;
+      let playedOpponentCount = 0;
+      let actualWins = 0;
+      let actualLosses = 0;
+      let projectedWins = 0;
+      let top40Wins = 0;
+      let top40Games = 0;
+      let coinflipGames = 0;
+      let sureThingGames = 0;
+      let longshotGames = 0;
+      
+      for (const game of completedGames) {
+        // Get opponent's power rating
+        const opponentRating = await pool.query(`
+          SELECT power_rating 
+          FROM team_power_ratings 
+          WHERE LOWER(TRIM(team_name)) = LOWER(TRIM($1)) 
+            AND season = $2
+        `, [game.opponent, season]);
+        
+        if (opponentRating.rows.length > 0) {
+          const oppRating = parseFloat(opponentRating.rows[0].power_rating);
+          sosPlayed += oppRating;
+          playedOpponentCount++;
+          
+          // Check if opponent is top 40
+          const opponentRank = await pool.query(`
+            SELECT COUNT(*) + 1 as rank
+            FROM team_power_ratings tpr
+            WHERE tpr.power_rating > $1 AND tpr.season = $2
+          `, [oppRating, season]);
+          
+          const oppRank = parseInt(opponentRank.rows[0].rank);
+          if (oppRank <= 40) {
+            top40Games++;
+          }
+        }
+        
+        // Calculate actual wins/losses
+        const teamScore = game.venue === 'home' ? game.home_points : game.away_points;
+        const oppScore = game.venue === 'home' ? game.away_points : game.home_points;
+        
+        if (teamScore > oppScore) {
+          actualWins++;
+          if (opponentRating.rows.length > 0) {
+            const oppRating = parseFloat(opponentRating.rows[0].power_rating);
+            const opponentRank = await pool.query(`
+              SELECT COUNT(*) + 1 as rank
+              FROM team_power_ratings tpr
+              WHERE tpr.power_rating > $1 AND tpr.season = $2
+            `, [oppRating, season]);
+            const oppRank = parseInt(opponentRank.rows[0].rank);
+            if (oppRank <= 40) top40Wins++;
+          }
+        } else {
+          actualLosses++;
+        }
+        
+        // Calculate win probability for this game (simplified)
+        if (opponentRating.rows.length > 0) {
+          const teamRating = parseFloat(team.team_rating);
+          const oppRating = parseFloat(opponentRating.rows[0].power_rating);
+          const homeAdvantage = game.venue === 'home' ? 2.15 : -2.15;
+          const ratingDiff = teamRating - oppRating + homeAdvantage;
+          
+          // Using normal distribution to calculate win probability
+          const winProb = normalCDF(ratingDiff, 0, 13.5);
+          projectedWins += winProb;
+          
+          // Categorize game difficulty
+          if (winProb >= 0.4 && winProb <= 0.6) coinflipGames++;
+          else if (winProb >= 0.8) sureThingGames++;
+          else if (winProb <= 0.2) longshotGames++;
+        }
+      }
+      
+      // Calculate SOS for remaining games (SOS Remaining)
+      let sosRemaining = 0;
+      let remainingOpponentCount = 0;
+      
+      for (const game of futureGames) {
+        const opponentRating = await pool.query(`
+          SELECT power_rating 
+          FROM team_power_ratings 
+          WHERE LOWER(TRIM(team_name)) = LOWER(TRIM($1)) 
+            AND season = $2
+        `, [game.opponent, season]);
+        
+        if (opponentRating.rows.length > 0) {
+          sosRemaining += parseFloat(opponentRating.rows[0].power_rating);
+          remainingOpponentCount++;
+        }
+      }
+      
+      // Calculate averages
+      const avgSOSPlayed = playedOpponentCount > 0 ? sosPlayed / playedOpponentCount : 0;
+      const avgSOSRemaining = remainingOpponentCount > 0 ? sosRemaining / remainingOpponentCount : 0;
+      const totalOpponents = playedOpponentCount + remainingOpponentCount;
+      const avgSOSOverall = totalOpponents > 0 ? 
+        (sosPlayed + sosRemaining) / totalOpponents : 0;
+      
+      sosData.push({
+        team: team.team,
+        conference: team.conference,
+        classification: team.classification,
+        logo_url: team.logo_url,
+        abbreviation: team.abbreviation,
+        team_rating: team.team_rating,
+        sos_overall: avgSOSOverall.toFixed(3),
+        sos_played: avgSOSPlayed.toFixed(3),
+        sos_remaining: avgSOSRemaining.toFixed(3),
+        actual_wins: actualWins,
+        actual_losses: actualLosses,
+        projected_wins: projectedWins.toFixed(1),
+        win_difference: actualWins - projectedWins,
+        top40_record: `${top40Wins}-${top40Games - top40Wins}`,
+        top40_games: top40Games,
+        coinflip_games: coinflipGames,
+        sure_thing_games: sureThingGames,
+        longshot_games: longshotGames,
+        games_played: completedGames.length,
+        games_remaining: futureGames.length
+      });
+    }
+    
+    // Sort by overall SOS (higher is harder)
+    sosData.sort((a, b) => parseFloat(b.sos_overall) - parseFloat(a.sos_overall));
+    
+    // Add SOS rankings
+    sosData.forEach((team, index) => {
+      team.sos_rank = index + 1;
+    });
+    
+    console.log(`✅ Calculated SOS for ${sosData.length} teams`);
+    
+    res.json({
+      teams: sosData,
+      metadata: {
+        season: season,
+        classification: classification,
+        total_teams: sosData.length,
+        conference_only: conferenceOnly === 'true',
+        include_postseason: includePostseason === 'true',
+        generated_at: new Date().toISOString()
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Error calculating SOS:', err);
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: err.message 
+    });
+  }
+});
+
+// Luck Leaderboard Endpoint
+app.get('/api/leaderboards/luck/:season', async (req, res) => {
+  try {
+    const { season } = req.params;
+    const { 
+      includePostseason = 'false', 
+      conferenceOnly = 'false',
+      conference = null 
+    } = req.query;
+    
+    console.log(`🍀 Calculating luck data for ${season}`);
+    
+    // Get all teams with their power ratings for the season
+    const teamsQuery = `
+      SELECT DISTINCT
+        t.school as team,
+        t.conference,
+        t.classification,
+        t.logo_url,
+        t.abbreviation,
+        COALESCE(tpr.power_rating, 0) as team_rating,
+        (SELECT COUNT(*) + 1 FROM team_power_ratings tpr2 
+         WHERE tpr2.power_rating > tpr.power_rating AND tpr2.season = $1) as power_rank
+      FROM teams t
+      LEFT JOIN team_power_ratings tpr ON LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name))
+        AND tpr.season = $1
+      WHERE t.classification = 'fbs'
+      ${conference ? 'AND t.conference = $2' : ''}
+      ORDER BY t.school
+    `;
+    
+    const queryParams = [season];
+    if (conference) queryParams.push(conference);
+    
+    const teamsResult = await pool.query(teamsQuery, queryParams);
+    const teams = teamsResult.rows;
+    
+    console.log(`📊 Found ${teams.length} teams for luck calculation`);
+    
+    if (teams.length === 0) {
+      return res.status(404).json({ 
+        error: `No teams found for ${season}` 
+      });
+    }
+    
+    // Calculate luck metrics for each team
+    const luckData = [];
+    
+    for (const team of teams) {
+      console.log(`🎲 Calculating luck for ${team.team}`);
+      
+      // Get all games for this team
+      let gamesQuery = `
+        SELECT 
+          g.*,
+          CASE 
+            WHEN g.home_team = $1 THEN g.away_team
+            ELSE g.home_team
+          END as opponent,
+          CASE 
+            WHEN g.home_team = $1 THEN 'home'
+            ELSE 'away'
+          END as venue
+        FROM games g
+        WHERE (g.home_team = $1 OR g.away_team = $1) 
+          AND g.season = $2
+          AND g.completed = true
+      `;
+      
+      const gameQueryParams = [team.team, season];
+      
+      // Add filters based on query parameters
+      if (conferenceOnly === 'true') {
+        gamesQuery += ` AND g.conference_game = true`;
+      }
+      
+      if (includePostseason === 'false') {
+        gamesQuery += ` AND g.season_type = 'regular'`;
+      }
+      
+      gamesQuery += ` ORDER BY g.week`;
+      
+      const gamesResult = await pool.query(gamesQuery, gameQueryParams);
+      const games = gamesResult.rows;
+      
+      // Initialize counters
+      let actualWins = 0;
+      let actualLosses = 0;
+      let expectedWins = 0;
+      let deservedWins = 0;
+      let closeGameWins = 0;
+      let closeGameTotal = 0;
+      let totalFumbles = 0;
+      let teamFumbleRecoveries = 0;
+      let totalInterceptions = 0;
+      let teamInterceptions = 0;
+      let turnovers = 0;
+      let takeaways = 0;
+      
+      // Process each game
+      for (const game of games) {
+        const teamScore = game.venue === 'home' ? game.home_points : game.away_points;
+        const oppScore = game.venue === 'home' ? game.away_points : game.home_points;
+        const scoreDiff = Math.abs(teamScore - oppScore);
+        
+        // Actual wins/losses
+        if (teamScore > oppScore) {
+          actualWins++;
+          if (scoreDiff <= 8) closeGameWins++;
+        } else {
+          actualLosses++;
+        }
+        
+        // Close games
+        if (scoreDiff <= 8) {
+          closeGameTotal++;
+        }
+        
+        // Expected wins (from betting lines)
+        if (game.home_moneyline && game.away_moneyline) {
+          const homeProb = moneylineToProbability(game.home_moneyline);
+          const awayProb = moneylineToProbability(game.away_moneyline);
+          
+          if (homeProb && awayProb) {
+            const totalProb = homeProb + awayProb;
+            const homeAdjusted = homeProb / totalProb;
+            const awayAdjusted = awayProb / totalProb;
+            
+            const teamProb = game.venue === 'home' ? homeAdjusted : awayAdjusted;
+            expectedWins += teamProb;
+          }
+        } else if (game.spread) {
+          const spreadValue = parseFloat(game.spread);
+          const adjustedSpread = game.venue === 'home' ? spreadValue : -spreadValue;
+          const winProb = normalCDF(-adjustedSpread, 0, 13.5);
+          expectedWins += winProb;
+        }
+        
+        // Deserved wins (from postgame win probability)
+        const postgameProb = game.venue === 'home' 
+          ? parseFloat(game.home_postgame_win_probability)
+          : parseFloat(game.away_postgame_win_probability);
+        
+        if (postgameProb) {
+          deservedWins += postgameProb;
+        }
+        
+        // Get game stats for turnover luck (if available)
+        const gameStatsQuery = `
+          SELECT 
+            team,
+            fumbles_lost,
+            fumbles_recovered,
+            interceptions
+          FROM game_stats
+          WHERE game_id = $1 AND (team = $2 OR team = $3)
+        `;
+        
+        try {
+          const gameStatsResult = await pool.query(gameStatsQuery, [
+            game.id, 
+            team.team, 
+            game.opponent
+          ]);
+          
+          const teamStats = gameStatsResult.rows.find(s => s.team === team.team);
+          const oppStats = gameStatsResult.rows.find(s => s.team === game.opponent);
+          
+          if (teamStats && oppStats) {
+            // Fumble luck
+            const gameFumbles = (teamStats.fumbles_lost || 0) + (oppStats.fumbles_lost || 0);
+            const teamRecoveries = (oppStats.fumbles_lost || 0); // Team recovers opponent fumbles
+            totalFumbles += gameFumbles;
+            teamFumbleRecoveries += teamRecoveries;
+            
+            // Interception luck
+            const gameInterceptions = (teamStats.interceptions || 0) + (oppStats.interceptions || 0);
+            totalInterceptions += gameInterceptions;
+            teamInterceptions += (teamStats.interceptions || 0);
+            
+            // Turnover margin
+            turnovers += (teamStats.fumbles_lost || 0);
+            takeaways += (teamStats.interceptions || 0) + (oppStats.fumbles_lost || 0);
+          }
+        } catch (err) {
+          // Game stats might not be available - continue without them
+          console.log(`📊 No game stats for ${team.team} vs ${game.opponent}`);
+        }
+      }
+      
+      // Calculate final metrics
+      const record = `${actualWins}-${actualLosses}`;
+      const expectedVsActual = actualWins - expectedWins;
+      const deservedVsActual = deservedWins - actualWins;
+      const expectedVsDeserved = deservedWins - expectedWins;
+      const closeGameRecord = closeGameTotal > 0 ? `${closeGameWins}-${closeGameTotal - closeGameWins}` : '0-0';
+      const fumbleRecoveryRate = totalFumbles > 0 ? (teamFumbleRecoveries / totalFumbles) * 100 : 50;
+      const interceptionRate = totalInterceptions > 0 ? (teamInterceptions / totalInterceptions) * 100 : 50;
+      const turnoverMargin = takeaways - turnovers;
+      
+      luckData.push({
+        team: team.team,
+        conference: team.conference,
+        logo_url: team.logo_url,
+        abbreviation: team.abbreviation,
+        power_rank: team.power_rank,
+        record: record,
+        expected_wins: expectedWins,
+        deserved_wins: deservedWins,
+        expected_vs_actual: expectedVsActual,
+        deserved_vs_actual: deservedVsActual,
+        expected_vs_deserved: expectedVsDeserved,
+        close_game_record: closeGameRecord,
+        fumble_recovery_rate: fumbleRecoveryRate,
+        interception_rate: interceptionRate,
+        turnover_margin: turnoverMargin,
+        games_played: games.length
+      });
+    }
+    
+    // Sort by expected vs actual difference (most lucky first)
+    luckData.sort((a, b) => b.expected_vs_actual - a.expected_vs_actual);
+    
+    console.log(`✅ Calculated luck data for ${luckData.length} teams`);
+    
+    res.json({
+      teams: luckData,
+      metadata: {
+        season: season,
+        total_teams: luckData.length,
+        include_postseason: includePostseason === 'true',
+        conference_only: conferenceOnly === 'true',
+        conference_filter: conference,
+        generated_at: new Date().toISOString()
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Error calculating luck data:', err);
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: err.message 
+    });
+  }
+});
+
+// FAST SOS Endpoint - reads from pre-calculated table
+app.get('/api/leaderboards/strength-of-schedule-fast/:season', async (req, res) => {
+  try {
+    const { season } = req.params;
+    const { classification = 'fbs' } = req.query;
+    
+    console.log(`🚀 Fast SOS fetch for ${season}`);
+    const start = Date.now();
+    
+    const result = await pool.query(`
+      SELECT 
+        sos.*,
+        t.logo_url,
+        t.conference,
+        t.abbreviation
+      FROM strength_of_schedule sos
+      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(sos.team_name))
+      WHERE sos.season = $1 AND sos.classification = $2
+      ORDER BY sos.sos_rank
+    `, [season, classification]);
+    
+    console.log(`✅ Fast SOS: ${result.rows.length} teams in ${Date.now() - start}ms`);
+    
+    res.json({
+      teams: result.rows,
+      metadata: {
+        season: parseInt(season),
+        total_teams: result.rows.length,
+        last_calculated: result.rows[0]?.last_updated,
+        calculation_time: `${Date.now() - start}ms (pre-calculated)`
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Fast SOS error:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// FAST Luck Endpoint - reads from pre-calculated table
+app.get('/api/leaderboards/luck-fast/:season', async (req, res) => {
+  try {
+    const { season } = req.params;
+    const { conference } = req.query;
+    
+    console.log(`🍀 Fast Luck fetch for ${season}`);
+    const start = Date.now();
+    
+    let query = `
+      SELECT 
+        la.*,
+        t.logo_url,
+        t.abbreviation,
+        CONCAT(la.wins, '-', la.losses) as record,
+        CASE 
+          WHEN la.close_game_total > 0 
+          THEN CONCAT(la.close_game_wins, '-', (la.close_game_total - la.close_game_wins))
+          ELSE '0-0'
+        END as close_game_record
+      FROM luck_analysis la
+      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(la.team_name))
+      WHERE la.season = $1
+    `;
+    
+    const params = [season];
+    
+    if (conference && conference !== 'all') {
+      query += ` AND la.conference = $2`;
+      params.push(conference);
+    }
+    
+    query += ` ORDER BY la.expected_vs_actual DESC`;
+    
+    const result = await pool.query(query, params);
+    
+    console.log(`✅ Fast Luck: ${result.rows.length} teams in ${Date.now() - start}ms`);
+    
+    res.json({
+      teams: result.rows,
+      metadata: {
+        season: parseInt(season),
+        total_teams: result.rows.length,
+        last_calculated: result.rows[0]?.last_updated,
+        calculation_time: `${Date.now() - start}ms (pre-calculated)`
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Fast Luck error:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Status endpoint to check calculation progress
+app.get('/api/calculation-status/:type/:season', async (req, res) => {
+  try {
+    const { type, season } = req.params;
+    
+    const result = await pool.query(`
+      SELECT * FROM calculation_status 
+      WHERE calculation_type = $1 AND season = $2
+    `, [type, season]);
+    
+    if (result.rows.length === 0) {
+      return res.json({ status: 'not_started' });
+    }
+    
+    res.json(result.rows[0]);
+    
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/debug/basic-game-stats', async (req, res) => {
+  try {
+    console.log('🔍 Testing basic game_team_stats query...');
+    
+    // Step 1: Check if table exists and has any data
+    const basicCount = await pool.query(`
+      SELECT COUNT(*) as total_rows
+      FROM game_team_stats
+    `);
+    
+    // Step 2: Check what seasons we have
+    const seasonCheck = await pool.query(`
+      SELECT 
+        g.season,
+        COUNT(*) as stat_records,
+        COUNT(DISTINCT gts.team) as unique_teams
+      FROM game_team_stats gts
+      LEFT JOIN games g ON gts.game_id = g.id
+      WHERE g.season IS NOT NULL
+      GROUP BY g.season
+      ORDER BY g.season DESC
+    `);
+    
+    // Step 3: Get a few sample rows to see the data
+    const sampleData = await pool.query(`
+      SELECT 
+        gts.team,
+        gts.completions,
+        gts.passingattempts,
+        gts.netpassingyards,
+        g.season,
+        g.completed
+      FROM game_team_stats gts
+      LEFT JOIN games g ON gts.game_id = g.id
+      ORDER BY g.season DESC, gts.team
+      LIMIT 10
+    `);
+    
+    // Step 4: Check team name matching
+    const teamNameCheck = await pool.query(`
+      SELECT 
+        gts.team as game_stats_team,
+        t.school as teams_table_school,
+        COUNT(*) as match_count
+      FROM game_team_stats gts
+      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(gts.team))
+      GROUP BY gts.team, t.school
+      ORDER BY match_count DESC
+      LIMIT 10
+    `);
+    
+    res.json({
+      debug_results: {
+        total_rows_in_game_team_stats: basicCount.rows[0],
+        seasons_available: seasonCheck.rows,
+        sample_data: sampleData.rows,
+        team_name_matching: teamNameCheck.rows
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Debug query failed:', err);
+    res.status(500).json({ 
+      error: 'Debug failed', 
+      details: err.message 
+    });
+  }
+});
+
+// Default route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'CFB Analytics API',
+    endpoints: [
+      'GET /api/health',
+      'GET /api/power-rankings?season=2025',
+      'GET /api/available-seasons',
+      'GET /api/teams/:teamName?season=2025',
+      'GET /api/teams/:teamName/stats?season=2024',
+      'GET /api/teams/:teamName/games?season=2024',
+      'GET /api/teams/:teamName/games-enhanced/:season',
+      'GET /api/all-advanced-stats/:season',
+      'GET /api/leaderboards/luck/:season (SLOW - 20+ seconds)',
+      'GET /api/leaderboards/luck-fast/:season (FAST - <100ms)',
+      'GET /api/leaderboards/strength-of-schedule-enhanced/:season (SLOW)',
+      'GET /api/leaderboards/strength-of-schedule-fast/:season (FAST)',
+      'GET /api/calculation-status/:type/:season',
+      'GET /api/debug-teams',
+      'GET /api/debug-columns'
+    ]
+  });
+});
+
+app.listen(port, () => {
+  console.log(`CFB API server running on port ${port}`);
+  console.log(`Database: ${process.env.DB_NAME || process.env.DB_DATABASE}`);
+  console.log(`Available endpoints: http://localhost:${port}/`);
+});

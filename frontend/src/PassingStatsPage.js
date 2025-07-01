@@ -762,25 +762,35 @@ const PassingStatsPage = () => {
                   backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
                 }}>
                   <td style={{
-                    padding: '8px 16px',
-                    border: '1px solid #dee2e6',
-                    fontFamily: 'Trebuchet MS, sans-serif',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    textTransform: 'uppercase'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <img 
-                        src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                        alt={team.team}
-                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-                        onError={(e) => {
-                          e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-                        }}
-                      />
-                      {team.team}
-                    </div>
-                  </td>
+                      padding: '4px 2px',
+                      border: '1px solid #dee2e6',
+                      fontFamily: 'Trebuchet MS, sans-serif',
+                      fontSize: '9px',
+                      fontWeight: 'bold',
+                      textTransform: 'uppercase'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <img 
+                          src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                          alt={team.team}
+                          style={{ width: '12px', height: '12px', objectFit: 'contain' }}
+                          onError={(e) => {
+                            e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                          }}
+                        />
+                        <a 
+                          href={`/team/${encodeURIComponent(team.team)}?season=${selectedSeason}`}
+                          style={{ 
+                            color: '#007bff', 
+                            textDecoration: 'none',
+                            fontSize: '8px',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          {team.team}
+                        </a>
+                      </div>
+                    </td>
                   <CellWithRank 
                     value={formatNumber(team.games_played, 'games_played')} 
                     statKey="games_played" 
@@ -864,7 +874,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  TEAM{getSortIcon('team')}
+                  TEAM
                 </th>
                 <th 
                   onClick={() => handleSort('games_played')}
@@ -880,7 +890,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  GP{getSortIcon('games_played')}
+                  GP
                 </th>
                 <th 
                   onClick={() => handleSort('completions')}
@@ -896,7 +906,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  CMP{getSortIcon('completions')}
+                  COMP
                 </th>
                 <th 
                   onClick={() => handleSort('attempts')}
@@ -912,7 +922,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  ATT{getSortIcon('attempts')}
+                  ATT
                 </th>
                 <th 
                   onClick={() => handleSort('passing_yards')}
@@ -928,7 +938,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  YDS{getSortIcon('passing_yards')}
+                  YDS
                 </th>
                 <th 
                   onClick={() => handleSort('yards_per_attempt')}
@@ -944,7 +954,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Y/A{getSortIcon('yards_per_attempt')}
+                  Y/A
                 </th>
                 <th 
                   onClick={() => handleSort('passing_touchdowns')}
@@ -960,7 +970,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  TD{getSortIcon('passing_touchdowns')}
+                  TD
                 </th>
                 <th 
                   onClick={() => handleSort('interceptions')}
@@ -976,7 +986,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  INT{getSortIcon('interceptions')}
+                  INT
                 </th>
                 <th 
                   onClick={() => handleSort('sacks_allowed')}
@@ -992,7 +1002,7 @@ const PassingStatsPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  SCK{getSortIcon('sacks_allowed')}
+                  SCK
                 </th>
               </tr>
             </thead>
@@ -1002,27 +1012,36 @@ const PassingStatsPage = () => {
                   backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
                 }}>
                   <td style={{
-                    padding: '4px 2px',
-                    border: '1px solid #dee2e6',
-                    fontFamily: 'Trebuchet MS, sans-serif',
-                    fontSize: '9px',
-                    fontWeight: 'bold',
-                    textTransform: 'uppercase'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <img 
-                        src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                        alt={team.team}
-                        style={{ width: '12px', height: '12px', objectFit: 'contain' }}
-                        onError={(e) => {
-                          e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-                        }}
-                      />
-                      <span style={{ fontSize: '8px' }}>
-                        {team.team}
-                      </span>
-                    </div>
-                  </td>
+  padding: '8px 16px',
+  border: '1px solid #dee2e6',
+  fontFamily: 'Trebuchet MS, sans-serif',
+  fontSize: '13px',
+  fontWeight: 'bold',
+  textTransform: 'uppercase'
+}}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img 
+                      src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                      alt={team.team}
+                      style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                      }}
+                    />
+                    <a 
+                      href={`/team/${encodeURIComponent(team.team)}?season=${selectedSeason}`}
+                      style={{ 
+                        color: '#007bff', 
+                        textDecoration: 'none',
+                        fontWeight: 'bold'
+                      }}
+                      onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+                      onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+                    >
+                      {team.team}
+                    </a>
+                  </div>
+                </td>
                   <CellWithRank 
                     value={formatNumber(team.games_played, 'games_played')} 
                     statKey="games_played" 

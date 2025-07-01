@@ -821,9 +821,7 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
   }
 });
 
-// Add this endpoint to your server.js file
-
-// Rushing Stats Leaderboard Endpoint
+// Rushing Stats Leaderboard Endpoint - COMPLETE CLEAN VERSION
 app.get('/api/leaderboards/rushing/:season', async (req, res) => {
   try {
     const { season } = req.params;
@@ -836,290 +834,172 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
     
     console.log(`🏃 Fetching rushing stats for ${season}, ${offense_defense}`);
     
-    // FIXED: Add DISTINCT to prevent duplicate counting from multiple game records
-    let query = `
-      SELECT DISTINCT ON (gts.team)
-        gts.team as team_name,
-        t.logo_url,
-        t.conference,
-        t.abbreviation,
-        t.classification,
-        
-        -- Count games properly using subquery to avoid duplicates
-        (SELECT COUNT(DISTINCT g2.id) 
-         FROM games g2 
-         WHERE (g2.home_team = gts.team OR g2.away_team = gts.team) 
-         AND g2.season = $1
-         ${conference_games_only === 'true' ? ' AND g2.conference_game = true' : ''}
-         ${regular_season_only === 'true' ? ' AND g2.season_type = \'regular\'' : ''}
-        ) as games_played,
-        
-        -- Aggregate stats with proper deduplication
-        (SELECT SUM(sub_gts.rushing_attempts) 
-         FROM game_team_stats_new sub_gts
-         JOIN games sub_g ON sub_gts.game_id = sub_g.id
-         WHERE sub_gts.team = gts.team 
-         AND sub_g.season = $1
-         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-        ) as rushing_attempts,
-        
-        (SELECT SUM(sub_gts.rushing_yards) 
-         FROM game_team_stats_new sub_gts
-         JOIN games sub_g ON sub_gts.game_id = sub_g.id
-         WHERE sub_gts.team = gts.team 
-         AND sub_g.season = $1
-         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-        ) as rushing_yards,
-        
-        (SELECT SUM(sub_gts.rushing_tds) 
-         FROM game_team_stats_new sub_gts
-         JOIN games sub_g ON sub_gts.game_id = sub_g.id
-         WHERE sub_gts.team = gts.team 
-         AND sub_g.season = $1
-         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-        ) as rushing_tds,
-        
-        -- Calculate yards per rush using subqueries
-        CASE 
-          WHEN (SELECT SUM(sub_gts.rushing_attempts) 
-                FROM game_team_stats_new sub_gts
-                JOIN games sub_g ON sub_gts.game_id = sub_g.id
-                WHERE sub_gts.team = gts.team 
-                AND sub_g.season = $1
-                ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-                ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-               ) > 0 
-          THEN ROUND(
-            (SELECT SUM(sub_gts.rushing_yards) 
-             FROM game_team_stats_new sub_gts
-             JOIN games sub_g ON sub_gts.game_id = sub_g.id
-             WHERE sub_gts.team = gts.team 
-             AND sub_g.season = $1
-             ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-             ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-            )::numeric / 
-            (SELECT SUM(sub_gts.rushing_attempts) 
-             FROM game_team_stats_new sub_gts
-             JOIN games sub_g ON sub_gts.game_id = sub_g.id
-             WHERE sub_gts.team = gts.team 
-             AND sub_g.season = $1
-             ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-             ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-            )::numeric, 2)
-          ELSE 0 
-        END as yards_per_rush,
-        
-        -- Calculate total plays using subqueries
-        (SELECT SUM(sub_gts.passing_attempts + sub_gts.rushing_attempts) 
-         FROM game_team_stats_new sub_gts
-         JOIN games sub_g ON sub_gts.game_id = sub_g.id
-         WHERE sub_gts.team = gts.team 
-         AND sub_g.season = $1
-         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-        ) as total_plays,
-        
-        -- Rushing rate calculation using subqueries  
-        CASE 
-          WHEN (SELECT SUM(sub_gts.passing_attempts + sub_gts.rushing_attempts) 
-                FROM game_team_stats_new sub_gts
-                JOIN games sub_g ON sub_gts.game_id = sub_g.id
-                WHERE sub_gts.team = gts.team 
-                AND sub_g.season = $1
-                ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-                ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-               ) > 0 
-          THEN ROUND(
-            ((SELECT SUM(sub_gts.rushing_attempts) 
-              FROM game_team_stats_new sub_gts
-              JOIN games sub_g ON sub_gts.game_id = sub_g.id
-              WHERE sub_gts.team = gts.team 
-              AND sub_g.season = $1
-              ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-              ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-             )::numeric / 
-             (SELECT SUM(sub_gts.passing_attempts + sub_gts.rushing_attempts) 
-              FROM game_team_stats_new sub_gts
-              JOIN games sub_g ON sub_gts.game_id = sub_g.id
-              WHERE sub_gts.team = gts.team 
-              AND sub_g.season = $1
-              ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
-              ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
-             )::numeric) * 100, 1)
-          ELSE 0 
-        END as rushing_rate
-        
-      FROM game_team_stats_new gts
-      JOIN games g ON gts.game_id = g.id
-      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(gts.team))url,
-        t.conference,
-        t.abbreviation,
-        t.classification,
-        COUNT(DISTINCT g.id) as games_played,
-        
-        -- Basic rushing stats (sum across all games)
-        SUM(gts.rushing_attempts) as rushing_attempts,
-        SUM(gts.rushing_yards) as rushing_yards, 
-        SUM(gts.rushing_tds) as rushing_tds,
-        
-        -- Calculate yards per rush (total yards / total attempts)
-        CASE 
-          WHEN SUM(gts.rushing_attempts) > 0 
-          THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
-          ELSE 0 
-        END as yards_per_rush,
-        
-        -- Calculate total plays and rushing rate
-        SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
-        
-        -- Rushing rate: rushing_attempts / total_plays * 100
-        CASE 
-          WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
-          THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
-          ELSE 0 
-        END as rushing_rate
-        
-      FROM game_team_stats_new gts
-      JOIN games g ON gts.game_id = g.id
-      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(gts.team))
-    `;
-    
-    // Build WHERE conditions - FILTER FOR FBS TEAMS ONLY
-    const conditions = [`g.season = $1`, `t.classification = 'fbs'`];
-    const params = [season];
+    // Setup parameters - SINGLE DECLARATION
+    const queryParams = [season];
     let paramIndex = 2;
     
-    // Conference filter
-    if (conference && conference !== 'all') {
-      conditions.push(`t.conference = $${paramIndex}`);
-      params.push(conference);
-      paramIndex++;
-    }
-    
-    // Conference games only filter
-    if (conference_games_only === 'true') {
-      conditions.push(`g.conference_game = true`);
-    }
-    
-    // Regular season only filter  
-    if (regular_season_only === 'true') {
-      conditions.push(`g.season_type = 'regular'`);
-    }
-    
-    // Add WHERE clause with FBS filter
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`;
-    }
-    
-    // Group by team and conference
-    query += `
-      GROUP BY gts.team, t.logo_url, t.conference, t.abbreviation, t.classification
-      HAVING SUM(gts.rushing_attempts) > 0
-      ORDER BY rushing_rate DESC
-    `;
-    
-    console.log(`🔍 Executing rushing query with ${params.length} parameters:`, params);
-    console.log(`📝 Query preview:`, query.substring(0, 200) + '...');
-    
-    const result = await pool.query(query, params);
-    let teams = result.rows;
-    
-    console.log(`📊 Found ${teams.length} teams with rushing data`);
-    
-    if (teams.length === 0) {
-      console.log(`⚠️ No teams found - checking if data exists in tables...`);
-      
-      // Quick debug query to see if data exists
-      const debugResult = await pool.query(`
-        SELECT COUNT(*) as total_games, COUNT(DISTINCT gts.team) as unique_teams
-        FROM game_team_stats_new gts 
-        JOIN games g ON gts.game_id = g.id 
-        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(gts.team))
-        WHERE g.season = $1
-      `, [season]);
-      
-      console.log(`🔍 Debug - Total games: ${debugResult.rows[0]?.total_games}, Unique teams: ${debugResult.rows[0]?.unique_teams}`);
-      
-      return res.json([]);
-    }
-    
-    // Handle defense stats by switching to opponent stats - SIMPLIFIED WITH FBS FILTER
-    if (offense_defense === 'defense') {
-      console.log(`🛡️ Converting to defense stats (opponent rushing allowed) - FBS ONLY`);
-      
-      // Simpler approach: Get what opponents did AGAINST each FBS team
-      let defenseQuery = `
-        SELECT 
-          defending_team as team_name,
-          t.logo_url,
-          t.conference, 
-          t.abbreviation,
-          t.classification,
-          COUNT(DISTINCT g.id) as games_played,
-          SUM(gts.rushing_attempts) as rushing_attempts,
-          SUM(gts.rushing_yards) as rushing_yards,
-          SUM(gts.rushing_tds) as rushing_tds,
-          CASE 
-            WHEN SUM(gts.rushing_attempts) > 0 
-            THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
-            ELSE 0 
-          END as yards_per_rush,
-          SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
-          CASE 
-            WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
-            THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
-            ELSE 0 
-          END as rushing_rate
-        FROM (
+    if (offense_defense === 'offense') {
+      // OFFENSE: Team's own rushing stats
+      let offenseQuery = `
+        WITH team_rushing_stats AS (
           SELECT 
-            gts.*,
-            g.*,
+            gts.team as team_name,
+            COUNT(DISTINCT g.id) as games_played,
+            SUM(gts.rushing_attempts) as rushing_attempts,
+            SUM(gts.rushing_yards) as rushing_yards, 
+            SUM(gts.rushing_tds) as rushing_tds,
+            SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
+            
+            -- Calculate yards per rush
             CASE 
-              WHEN g.home_team = gts.team THEN g.away_team
-              ELSE g.home_team 
-            END as defending_team
+              WHEN SUM(gts.rushing_attempts) > 0 
+              THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
+              ELSE 0 
+            END as yards_per_rush,
+            
+            -- Calculate rushing rate
+            CASE 
+              WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
+              THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
+              ELSE 0 
+            END as rushing_rate
+            
           FROM game_team_stats_new gts
           JOIN games g ON gts.game_id = g.id
           WHERE g.season = $1
             ${conference_games_only === 'true' ? ' AND g.conference_game = true' : ''}
             ${regular_season_only === 'true' ? ' AND g.season_type = \'regular\'' : ''}
-        ) defense_data
-        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(defense_data.defending_team))
+          GROUP BY gts.team
+          HAVING SUM(gts.rushing_attempts) > 0
+        )
+        SELECT 
+          trs.*,
+          t.logo_url,
+          t.conference,
+          t.abbreviation,
+          t.classification
+        FROM team_rushing_stats trs
+        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(trs.team_name))
         WHERE t.classification = 'fbs'
-        ${conference && conference !== 'all' ? ' AND t.conference = $2' : ''}
-        GROUP BY defending_team, t.logo_url, t.conference, t.abbreviation, t.classification
-        HAVING SUM(defense_data.rushing_attempts) > 0
-        ORDER BY yards_per_rush ASC
-      `; // Defense: lower yards per rush is better
+      `;
       
-      const defenseResult = await pool.query(defenseQuery, params);
-      teams = defenseResult.rows;
+      // Add conference filter if needed
+      if (conference && conference !== 'all') {
+        offenseQuery += ` AND t.conference = $${paramIndex}`;
+        queryParams.push(conference);
+        paramIndex++;
+      }
       
-      console.log(`🛡️ Processed ${teams.length} FBS teams for defense stats`);
+      offenseQuery += ` ORDER BY rushing_rate DESC`;
+      
+      console.log(`🔍 Executing offense rushing query with ${queryParams.length} parameters`);
+      const result = await pool.query(offenseQuery, queryParams);
+      const teams = result.rows;
+      
+      console.log(`📊 Found ${teams.length} FBS teams with offense rushing data`);
+      
+      // Clean up data and ensure proper types
+      const processedTeams = teams.map(team => ({
+        team_name: team.team_name,
+        logo_url: team.logo_url || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
+        conference: team.conference || 'Unknown',
+        abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
+        games_played: parseInt(team.games_played) || 0,
+        rushing_attempts: parseInt(team.rushing_attempts) || 0,
+        rushing_yards: parseInt(team.rushing_yards) || 0,
+        rushing_tds: parseInt(team.rushing_tds) || 0,
+        yards_per_rush: parseFloat(team.yards_per_rush) || 0,
+        total_plays: parseInt(team.total_plays) || 0,
+        rushing_rate: parseFloat(team.rushing_rate) || 0
+      }));
+      
+      console.log(`✅ Returning ${processedTeams.length} teams for offense rushing stats`);
+      res.json(processedTeams);
+      
+    } else {
+      // DEFENSE: What opponents did AGAINST each FBS team
+      console.log(`🛡️ Converting to defense stats (opponent rushing allowed) - FBS ONLY`);
+      
+      let defenseQuery = `
+        WITH defense_stats AS (
+          SELECT 
+            CASE 
+              WHEN g.home_team = gts.team THEN g.away_team
+              ELSE g.home_team 
+            END as defending_team,
+            COUNT(DISTINCT g.id) as games_played,
+            SUM(gts.rushing_attempts) as rushing_attempts,
+            SUM(gts.rushing_yards) as rushing_yards,
+            SUM(gts.rushing_tds) as rushing_tds,
+            SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
+            CASE 
+              WHEN SUM(gts.rushing_attempts) > 0 
+              THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
+              ELSE 0 
+            END as yards_per_rush,
+            CASE 
+              WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
+              THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
+              ELSE 0 
+            END as rushing_rate
+          FROM game_team_stats_new gts
+          JOIN games g ON gts.game_id = g.id
+          WHERE g.season = $1
+            ${conference_games_only === 'true' ? ' AND g.conference_game = true' : ''}
+            ${regular_season_only === 'true' ? ' AND g.season_type = \'regular\'' : ''}
+          GROUP BY defending_team
+          HAVING SUM(gts.rushing_attempts) > 0
+        )
+        SELECT 
+          ds.defending_team as team_name,
+          ds.games_played,
+          ds.rushing_attempts,
+          ds.rushing_yards,
+          ds.rushing_tds,
+          ds.total_plays,
+          ds.yards_per_rush,
+          ds.rushing_rate,
+          t.logo_url,
+          t.conference,
+          t.abbreviation,
+          t.classification
+        FROM defense_stats ds
+        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(ds.defending_team))
+        WHERE t.classification = 'fbs'
+      `;
+      
+      // Add conference filter if needed
+      if (conference && conference !== 'all') {
+        defenseQuery += ` AND t.conference = $${paramIndex}`;
+        queryParams.push(conference);
+      }
+      
+      defenseQuery += ` ORDER BY ds.yards_per_rush ASC`; // Defense: lower is better
+      
+      console.log(`🔍 Executing defense rushing query with ${queryParams.length} parameters`);
+      const defenseResult = await pool.query(defenseQuery, queryParams);
+      const teams = defenseResult.rows;
+      
+      console.log(`🛡️ Found ${teams.length} FBS teams for defense stats`);
+      
+      // Clean up data and ensure proper types
+      const processedTeams = teams.map(team => ({
+        team_name: team.team_name,
+        logo_url: team.logo_url || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
+        conference: team.conference || 'Unknown',
+        abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
+        games_played: parseInt(team.games_played) || 0,
+        rushing_attempts: parseInt(team.rushing_attempts) || 0,
+        rushing_yards: parseInt(team.rushing_yards) || 0,
+        rushing_tds: parseInt(team.rushing_tds) || 0,
+        yards_per_rush: parseFloat(team.yards_per_rush) || 0,
+        total_plays: parseInt(team.total_plays) || 0,
+        rushing_rate: parseFloat(team.rushing_rate) || 0
+      }));
+      
+      console.log(`✅ Returning ${processedTeams.length} teams for defense rushing stats`);
+      res.json(processedTeams);
     }
-    
-    // Clean up data and ensure proper types
-    const processedTeams = teams.map(team => ({
-      team_name: team.team_name,
-      logo_url: team.logo_url || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
-      conference: team.conference || 'Unknown',
-      abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
-      games_played: parseInt(team.games_played) || 0,
-      rushing_attempts: parseInt(team.rushing_attempts) || 0,
-      rushing_yards: parseInt(team.rushing_yards) || 0,
-      rushing_tds: parseInt(team.rushing_tds) || 0,
-      yards_per_rush: parseFloat(team.yards_per_rush) || 0,
-      total_plays: parseInt(team.total_plays) || 0,
-      rushing_rate: parseFloat(team.rushing_rate) || 0
-    }));
-    
-    console.log(`✅ Returning ${processedTeams.length} teams for ${offense_defense} rushing stats`);
-    
-    // Return consistent format - just the array of teams
-    res.json(processedTeams);
     
   } catch (err) {
     console.error('❌ Error fetching rushing stats:', err);
@@ -1127,48 +1007,9 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
       error: 'Internal server error', 
       details: err.message 
     });
+  }
+});
 
-// Simple debug endpoint for rushing stats
-app.get('/api/debug/rushing/:season', async (req, res) => {
-  try {
-    const { season } = req.params;
-    
-    console.log(`🔍 Debug rushing endpoint for season ${season}`);
-    
-    // Test basic data availability
-    const testQuery = `
-      SELECT 
-        gts.team,
-        COUNT(*) as game_count,
-        SUM(gts.rushing_attempts) as total_rushing_attempts,
-        SUM(gts.rushing_yards) as total_rushing_yards
-      FROM game_team_stats_new gts
-      JOIN games g ON gts.game_id = g.id
-      WHERE g.season = $1
-      GROUP BY gts.team
-      ORDER BY total_rushing_yards DESC
-      LIMIT 10
-    `;
-    
-    const result = await pool.query(testQuery, [season]);
-    
-    res.json({
-      season: season,
-      message: `Found ${result.rows.length} teams with rushing data`,
-      sample_teams: result.rows,
-      query_used: testQuery
-    });
-    
-  } catch (err) {
-    console.error('❌ Debug rushing error:', err);
-    res.status(500).json({ 
-      error: 'Debug endpoint failed', 
-      details: err.message 
-    });
-  }
-});
-  }
-});
 // 🔧 STEP 2: Remove debug info from TeamPage component
 
 // In your TeamPage.js, find and DELETE these lines (around where you have the debug component):

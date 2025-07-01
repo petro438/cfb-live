@@ -842,44 +842,56 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
       // OFFENSE: Team's own rushing stats
       let offenseQuery = `
         WITH team_rushing_stats AS (
-          SELECT 
+          SELECT DISTINCT ON (gts.team, g.id)
             gts.team as team_name,
-            COUNT(DISTINCT g.id) as games_played,
-            SUM(gts.rushing_attempts) as rushing_attempts,
-            SUM(gts.rushing_yards) as rushing_yards, 
-            SUM(gts.rushing_tds) as rushing_tds,
-            SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
-            
-            -- Calculate yards per rush
-            CASE 
-              WHEN SUM(gts.rushing_attempts) > 0 
-              THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
-              ELSE 0 
-            END as yards_per_rush,
-            
-            -- Calculate rushing rate
-            CASE 
-              WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
-              THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
-              ELSE 0 
-            END as rushing_rate
+            g.id as game_id,
+            gts.rushing_attempts,
+            gts.rushing_yards, 
+            gts.rushing_tds,
+            gts.passing_attempts + gts.rushing_attempts as total_plays_per_game
             
           FROM game_team_stats_new gts
           JOIN games g ON gts.game_id = g.id
           WHERE g.season = $1
             ${conference_games_only === 'true' ? ' AND g.conference_game = true' : ''}
             ${regular_season_only === 'true' ? ' AND g.season_type = \'regular\'' : ''}
-          GROUP BY gts.team
-          HAVING SUM(gts.rushing_attempts) > 0
+          ORDER BY gts.team, g.id, gts.rushing_yards DESC
+        ),
+        aggregated_stats AS (
+          SELECT 
+            team_name,
+            COUNT(DISTINCT game_id) as games_played,
+            SUM(rushing_attempts) as rushing_attempts,
+            SUM(rushing_yards) as rushing_yards, 
+            SUM(rushing_tds) as rushing_tds,
+            SUM(total_plays_per_game) as total_plays,
+            
+            -- Calculate yards per rush
+            CASE 
+              WHEN SUM(rushing_attempts) > 0 
+              THEN ROUND(SUM(rushing_yards)::numeric / SUM(rushing_attempts)::numeric, 2)
+              ELSE 0 
+            END as yards_per_rush,
+            
+            -- Calculate rushing rate
+            CASE 
+              WHEN SUM(total_plays_per_game) > 0 
+              THEN ROUND((SUM(rushing_attempts)::numeric / SUM(total_plays_per_game)::numeric) * 100, 1)
+              ELSE 0 
+            END as rushing_rate
+            
+          FROM team_rushing_stats
+          GROUP BY team_name
+          HAVING SUM(rushing_attempts) > 0
         )
         SELECT 
-          trs.*,
+          ags.*,
           t.logo_url,
           t.conference,
           t.abbreviation,
           t.classification
-        FROM team_rushing_stats trs
-        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(trs.team_name))
+        FROM aggregated_stats ags
+        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(ags.team_name))
         WHERE t.classification = 'fbs'
       `;
       
@@ -921,34 +933,46 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
       console.log(`🛡️ Converting to defense stats (opponent rushing allowed) - FBS ONLY`);
       
       let defenseQuery = `
-        WITH defense_stats AS (
-          SELECT 
+        WITH unique_defense_stats AS (
+          SELECT DISTINCT ON (g.id, gts.team)
+            g.id as game_id,
+            gts.team as attacking_team,
             CASE 
               WHEN g.home_team = gts.team THEN g.away_team
               ELSE g.home_team 
             END as defending_team,
-            COUNT(DISTINCT g.id) as games_played,
-            SUM(gts.rushing_attempts) as rushing_attempts,
-            SUM(gts.rushing_yards) as rushing_yards,
-            SUM(gts.rushing_tds) as rushing_tds,
-            SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
-            CASE 
-              WHEN SUM(gts.rushing_attempts) > 0 
-              THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
-              ELSE 0 
-            END as yards_per_rush,
-            CASE 
-              WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
-              THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
-              ELSE 0 
-            END as rushing_rate
+            gts.rushing_attempts,
+            gts.rushing_yards,
+            gts.rushing_tds,
+            gts.passing_attempts + gts.rushing_attempts as total_plays_per_game
           FROM game_team_stats_new gts
           JOIN games g ON gts.game_id = g.id
           WHERE g.season = $1
             ${conference_games_only === 'true' ? ' AND g.conference_game = true' : ''}
             ${regular_season_only === 'true' ? ' AND g.season_type = \'regular\'' : ''}
+          ORDER BY g.id, gts.team, gts.rushing_yards DESC
+        ),
+        defense_stats AS (
+          SELECT 
+            defending_team,
+            COUNT(DISTINCT game_id) as games_played,
+            SUM(rushing_attempts) as rushing_attempts,
+            SUM(rushing_yards) as rushing_yards,
+            SUM(rushing_tds) as rushing_tds,
+            SUM(total_plays_per_game) as total_plays,
+            CASE 
+              WHEN SUM(rushing_attempts) > 0 
+              THEN ROUND(SUM(rushing_yards)::numeric / SUM(rushing_attempts)::numeric, 2)
+              ELSE 0 
+            END as yards_per_rush,
+            CASE 
+              WHEN SUM(total_plays_per_game) > 0 
+              THEN ROUND((SUM(rushing_attempts)::numeric / SUM(total_plays_per_game)::numeric) * 100, 1)
+              ELSE 0 
+            END as rushing_rate
+          FROM unique_defense_stats
           GROUP BY defending_team
-          HAVING SUM(gts.rushing_attempts) > 0
+          HAVING SUM(rushing_attempts) > 0
         )
         SELECT 
           ds.defending_team as team_name,

@@ -762,35 +762,25 @@ const PassingStatsPage = () => {
                   backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
                 }}>
                   <td style={{
-                      padding: '4px 2px',
-                      border: '1px solid #dee2e6',
-                      fontFamily: 'Trebuchet MS, sans-serif',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <img 
-                          src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                          alt={team.team}
-                          style={{ width: '18px', height: '18px', objectFit: 'contain' }}
-                          onError={(e) => {
-                            e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-                          }}
-                        />
-                        <a 
-                          href={`/team/${encodeURIComponent(team.team)}?season=${selectedSeason}`}
-                          style={{ 
-                            color: '#007bff', 
-                            textDecoration: 'none',
-                            fontSize: '8px',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          {team.team}
-                        </a>
-                      </div>
-                    </td>
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <img 
+                        src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                        alt={team.team}
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                        }}
+                      />
+                      {team.team}
+                    </div>
+                  </td>
                   <CellWithRank 
                     value={formatNumber(team.games_played, 'games_played')} 
                     statKey="games_played" 
@@ -879,10 +869,10 @@ const PassingStatsPage = () => {
                 <th 
                   onClick={() => handleSort('games_played')}
                   style={{
-                    padding: '2px 1px',
+                    padding: '4px 2px',
                     border: '1px solid #dee2e6',
                     fontFamily: 'Trebuchet MS, sans-serif',
-                    fontSize: '7px',
+                    fontSize: '9px',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
                     textAlign: 'center',
@@ -1012,36 +1002,27 @@ const PassingStatsPage = () => {
                   backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
                 }}>
                   <td style={{
-  padding: '8px 16px',
-  border: '1px solid #dee2e6',
-  fontFamily: 'Trebuchet MS, sans-serif',
-  fontSize: '13px',
-  fontWeight: 'bold',
-  textTransform: 'uppercase'
-}}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <img 
-                      src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                      alt={team.team}
-                      style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-                      onError={(e) => {
-                        e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-                      }}
-                    />
-                    <a 
-                      href={`/team/${encodeURIComponent(team.team)}?season=${selectedSeason}`}
-                      style={{ 
-                        color: '#007bff', 
-                        textDecoration: 'none',
-                        fontWeight: 'bold'
-                      }}
-                      onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                      onMouseOut={(e) => e.target.style.textDecoration = 'none'}
-                    >
-                      {team.team}
-                    </a>
-                  </div>
-                </td>
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <img 
+                        src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                        alt={team.team}
+                        style={{ width: '12px', height: '12px', objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                        }}
+                      />
+                      <span style={{ fontSize: '8px' }}>
+                        {team.team}
+                      </span>
+                    </div>
+                  </td>
                   <CellWithRank 
                     value={formatNumber(team.games_played, 'games_played')} 
                     statKey="games_played" 

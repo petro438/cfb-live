@@ -35,6 +35,6 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "cache-bust": "clean-build-1751318024"
 }
-  "cache-bust": "clean-build-1751318024",

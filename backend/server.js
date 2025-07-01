@@ -836,34 +836,119 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
     
     console.log(`🏃 Fetching rushing stats for ${season}, ${offense_defense}`);
     
-    // Base query for rushing stats
+    // FIXED: Base query with deduplication and FBS filter
     let query = `
-      SELECT 
+      SELECT DISTINCT ON (gts.team)
         gts.team as team_name,
         t.logo_url,
         t.conference,
         t.abbreviation,
-        COUNT(DISTINCT g.id) as games_played,
+        t.classification,
         
-        -- Basic rushing stats (sum across all games)
-        SUM(gts.rushing_attempts) as rushing_attempts,
-        SUM(gts.rushing_yards) as rushing_yards, 
-        SUM(gts.rushing_tds) as rushing_tds,
+        -- Use subquery to prevent duplication when counting games
+        (SELECT COUNT(DISTINCT g2.id) 
+         FROM games g2 
+         WHERE (g2.home_team = gts.team OR g2.away_team = gts.team) 
+         AND g2.season = $1
+         ${conference_games_only === 'true' ? ' AND g2.conference_game = true' : ''}
+         ${regular_season_only === 'true' ? ' AND g2.season_type = \'regular\'' : ''}
+        ) as games_played,
         
-        -- Calculate yards per rush (total yards / total attempts)
+        -- Aggregate stats using DISTINCT game tracking
+        (SELECT SUM(sub_gts.rushing_attempts) 
+         FROM game_team_stats_new sub_gts
+         JOIN games sub_g ON sub_gts.game_id = sub_g.id
+         WHERE sub_gts.team = gts.team 
+         AND sub_g.season = $1
+         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+        ) as rushing_attempts,
+        
+        (SELECT SUM(sub_gts.rushing_yards) 
+         FROM game_team_stats_new sub_gts
+         JOIN games sub_g ON sub_gts.game_id = sub_g.id
+         WHERE sub_gts.team = gts.team 
+         AND sub_g.season = $1
+         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+        ) as rushing_yards,
+        
+        (SELECT SUM(sub_gts.rushing_tds) 
+         FROM game_team_stats_new sub_gts
+         JOIN games sub_g ON sub_gts.game_id = sub_g.id
+         WHERE sub_gts.team = gts.team 
+         AND sub_g.season = $1
+         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+        ) as rushing_tds,
+        
+        -- Calculate yards per rush 
         CASE 
-          WHEN SUM(gts.rushing_attempts) > 0 
-          THEN ROUND(SUM(gts.rushing_yards)::numeric / SUM(gts.rushing_attempts)::numeric, 2)
+          WHEN (SELECT SUM(sub_gts.rushing_attempts) 
+                FROM game_team_stats_new sub_gts
+                JOIN games sub_g ON sub_gts.game_id = sub_g.id
+                WHERE sub_gts.team = gts.team 
+                AND sub_g.season = $1
+                ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+                ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+               ) > 0 
+          THEN ROUND(
+            (SELECT SUM(sub_gts.rushing_yards) 
+             FROM game_team_stats_new sub_gts
+             JOIN games sub_g ON sub_gts.game_id = sub_g.id
+             WHERE sub_gts.team = gts.team 
+             AND sub_g.season = $1
+             ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+             ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+            )::numeric / 
+            (SELECT SUM(sub_gts.rushing_attempts) 
+             FROM game_team_stats_new sub_gts
+             JOIN games sub_g ON sub_gts.game_id = sub_g.id
+             WHERE sub_gts.team = gts.team 
+             AND sub_g.season = $1
+             ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+             ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+            )::numeric, 2)
           ELSE 0 
         END as yards_per_rush,
         
-        -- Calculate total plays and rushing rate
-        SUM(gts.passing_attempts + gts.rushing_attempts) as total_plays,
+        -- Calculate total plays
+        (SELECT SUM(sub_gts.passing_attempts + sub_gts.rushing_attempts) 
+         FROM game_team_stats_new sub_gts
+         JOIN games sub_g ON sub_gts.game_id = sub_g.id
+         WHERE sub_gts.team = gts.team 
+         AND sub_g.season = $1
+         ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+         ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+        ) as total_plays,
         
-        -- Rushing rate: rushing_attempts / total_plays * 100
+        -- Rushing rate calculation
         CASE 
-          WHEN SUM(gts.passing_attempts + gts.rushing_attempts) > 0 
-          THEN ROUND((SUM(gts.rushing_attempts)::numeric / SUM(gts.passing_attempts + gts.rushing_attempts)::numeric) * 100, 1)
+          WHEN (SELECT SUM(sub_gts.passing_attempts + sub_gts.rushing_attempts) 
+                FROM game_team_stats_new sub_gts
+                JOIN games sub_g ON sub_gts.game_id = sub_g.id
+                WHERE sub_gts.team = gts.team 
+                AND sub_g.season = $1
+                ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+                ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+               ) > 0 
+          THEN ROUND(
+            ((SELECT SUM(sub_gts.rushing_attempts) 
+              FROM game_team_stats_new sub_gts
+              JOIN games sub_g ON sub_gts.game_id = sub_g.id
+              WHERE sub_gts.team = gts.team 
+              AND sub_g.season = $1
+              ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+              ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+             )::numeric / 
+             (SELECT SUM(sub_gts.passing_attempts + sub_gts.rushing_attempts) 
+              FROM game_team_stats_new sub_gts
+              JOIN games sub_g ON sub_gts.game_id = sub_g.id
+              WHERE sub_gts.team = gts.team 
+              AND sub_g.season = $1
+              ${conference_games_only === 'true' ? ' AND sub_g.conference_game = true' : ''}
+              ${regular_season_only === 'true' ? ' AND sub_g.season_type = \'regular\'' : ''}
+             )::numeric) * 100, 1)
           ELSE 0 
         END as rushing_rate
         
@@ -872,8 +957,8 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
       LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(gts.team))
     `;
     
-    // Build WHERE conditions
-    const conditions = [`g.season = $1`];
+    // Build WHERE conditions - FILTER FOR FBS TEAMS ONLY
+    const conditions = [`g.season = $1`, `t.classification = 'fbs'`];
     const params = [season];
     let paramIndex = 2;
     
@@ -894,16 +979,14 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
       conditions.push(`g.season_type = 'regular'`);
     }
     
-    // Add WHERE clause
+    // Add WHERE clause with FBS filter
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
     
-    // Group by team and conference
+    // Group by team info - ORDER BY rushing rate for offense, yards per rush for defense
     query += `
-      GROUP BY gts.team, t.logo_url, t.conference, t.abbreviation
-      HAVING SUM(gts.rushing_attempts) > 0
-      ORDER BY rushing_rate DESC
+      ORDER BY gts.team, g.season DESC
     `;
     
     console.log(`🔍 Executing rushing query with ${params.length} parameters`);

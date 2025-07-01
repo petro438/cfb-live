@@ -400,7 +400,10 @@ const RushingStatsPage = () => {
       </div>
 
       {/* Desktop Table */}
-      <div style={{ display: 'block' }}>
+      <div style={{ 
+        display: 'block',
+        '@media (max-width: 768px)': { display: 'none' }
+      }} className="desktop-table">
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -417,6 +420,7 @@ const RushingStatsPage = () => {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 borderBottom: '1px solid #dee2e6',
+                borderRight: '1px solid #dee2e6',
                 minWidth: '180px',
                 cursor: 'pointer'
               }} onClick={() => handleSort('team_name')}>
@@ -430,6 +434,7 @@ const RushingStatsPage = () => {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 borderBottom: '1px solid #dee2e6',
+                borderRight: '1px solid #dee2e6',
                 minWidth: '60px',
                 cursor: 'pointer'
               }} onClick={() => handleSort('games_played')}>
@@ -443,6 +448,7 @@ const RushingStatsPage = () => {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 borderBottom: '1px solid #dee2e6',
+                borderRight: '1px solid #dee2e6',
                 minWidth: '80px',
                 cursor: 'pointer'
               }} onClick={() => handleSort('rushing_rate_display')}>
@@ -456,6 +462,7 @@ const RushingStatsPage = () => {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 borderBottom: '1px solid #dee2e6',
+                borderRight: '1px solid #dee2e6',
                 minWidth: '80px',
                 cursor: 'pointer'
               }} onClick={() => handleSort(totalPerGame === 'per_game' ? 'rushing_attempts_per_game' : 'rushing_attempts')}>
@@ -469,6 +476,7 @@ const RushingStatsPage = () => {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 borderBottom: '1px solid #dee2e6',
+                borderRight: '1px solid #dee2e6',
                 minWidth: '80px',
                 cursor: 'pointer'
               }} onClick={() => handleSort(totalPerGame === 'per_game' ? 'rushing_yards_per_game' : 'rushing_yards')}>
@@ -482,6 +490,7 @@ const RushingStatsPage = () => {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 borderBottom: '1px solid #dee2e6',
+                borderRight: '1px solid #dee2e6',
                 minWidth: '80px',
                 cursor: 'pointer'
               }} onClick={() => handleSort('yards_per_rush')}>
@@ -513,7 +522,8 @@ const RushingStatsPage = () => {
                   fontWeight: 'bold',
                   fontSize: '13px',
                   textTransform: 'uppercase',
-                  borderBottom: '1px solid #dee2e6'
+                  borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6'
                 }}>
                   <Link 
                     to={`/team/${encodeURIComponent(team.team_name)}?season=${selectedSeason}`}
@@ -544,7 +554,8 @@ const RushingStatsPage = () => {
                   textAlign: 'center',
                   fontFamily: 'Consolas, monospace',
                   fontSize: '13px',
-                  borderBottom: '1px solid #dee2e6'
+                  borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6'
                 }}>
                   {team.games_played || 0}
                 </td>
@@ -554,6 +565,7 @@ const RushingStatsPage = () => {
                   fontFamily: 'Consolas, monospace',
                   fontSize: '13px',
                   borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6',
                   backgroundColor: getPercentileColor(team.rushing_rate_display_percentile || 0),
                   position: 'relative'
                 }}>
@@ -574,6 +586,7 @@ const RushingStatsPage = () => {
                   fontFamily: 'Consolas, monospace',
                   fontSize: '13px',
                   borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6',
                   backgroundColor: getPercentileColor(
                     totalPerGame === 'per_game' ? 
                     team.rushing_attempts_per_game_percentile : 
@@ -603,6 +616,7 @@ const RushingStatsPage = () => {
                   fontFamily: 'Consolas, monospace',
                   fontSize: '13px',
                   borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6',
                   backgroundColor: getPercentileColor(
                     totalPerGame === 'per_game' ? 
                     team.rushing_yards_per_game_percentile : 
@@ -632,6 +646,7 @@ const RushingStatsPage = () => {
                   fontFamily: 'Consolas, monospace',
                   fontSize: '13px',
                   borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6',
                   backgroundColor: getPercentileColor(team.yards_per_rush_percentile || 0),
                   position: 'relative'
                 }}>
@@ -680,6 +695,262 @@ const RushingStatsPage = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Mobile Table */}
+      <div style={{ 
+        display: 'none',
+        '@media (max-width: 768px)': { display: 'block' }
+      }} className="mobile-table">
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          border: '1px solid #dee2e6',
+          backgroundColor: 'white'
+        }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f8f9fa' }}>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'left',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '22%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort('team_name')}>
+                TEAM
+              </th>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'center',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '8%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort('games_played')}>
+                GP
+              </th>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'center',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '14%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort('rushing_rate_display')}>
+                RATE
+              </th>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'center',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '12%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort(totalPerGame === 'per_game' ? 'rushing_attempts_per_game' : 'rushing_attempts')}>
+                ATT
+              </th>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'center',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '14%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort(totalPerGame === 'per_game' ? 'rushing_yards_per_game' : 'rushing_yards')}>
+                YDS
+              </th>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'center',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '14%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort('yards_per_rush')}>
+                Y/R
+              </th>
+              <th style={{
+                padding: '4px 2px',
+                textAlign: 'center',
+                fontFamily: '"Trebuchet MS", sans-serif',
+                fontWeight: 'bold',
+                fontSize: '8px',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #dee2e6',
+                width: '10%',
+                cursor: 'pointer'
+              }} onClick={() => handleSort(totalPerGame === 'per_game' ? 'rushing_tds_per_game' : 'rushing_tds')}>
+                TD
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {teamsWithRankings.map((team, index) => (
+              <tr key={team.team_name} style={{
+                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+              }}>
+                <td style={{
+                  padding: '4px 2px',
+                  fontFamily: '"Trebuchet MS", sans-serif',
+                  fontWeight: 'bold',
+                  fontSize: '8px',
+                  textTransform: 'uppercase',
+                  borderBottom: '1px solid #dee2e6',
+                  width: '22%'
+                }}>
+                  <Link 
+                    to={`/team/${encodeURIComponent(team.team_name)}?season=${selectedSeason}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    {team.logo_url && (
+                      <img 
+                        src={team.logo_url} 
+                        alt={team.team_name}
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          marginRight: '4px',
+                          objectFit: 'contain'
+                        }}
+                      />
+                    )}
+                    <span style={{ fontSize: '8px' }}>{team.team_name}</span>
+                  </Link>
+                </td>
+                <td style={{
+                  padding: '4px 2px',
+                  textAlign: 'center',
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: '9px',
+                  borderBottom: '1px solid #dee2e6',
+                  width: '8%'
+                }}>
+                  {team.games_played || 0}
+                </td>
+                <td style={{
+                  padding: '4px 2px',
+                  textAlign: 'center',
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: '9px',
+                  borderBottom: '1px solid #dee2e6',
+                  backgroundColor: getPercentileColor(team.rushing_rate_display_percentile || 0),
+                  width: '14%'
+                }}>
+                  {formatStat(team.rushing_rate_display, 'rushing_rate')}
+                </td>
+                <td style={{
+                  padding: '4px 2px',
+                  textAlign: 'center',
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: '9px',
+                  borderBottom: '1px solid #dee2e6',
+                  backgroundColor: getPercentileColor(
+                    totalPerGame === 'per_game' ? 
+                    team.rushing_attempts_per_game_percentile : 
+                    team.rushing_attempts_percentile || 0
+                  ),
+                  width: '12%'
+                }}>
+                  {formatStat(
+                    totalPerGame === 'per_game' ? team.rushing_attempts_per_game : team.rushing_attempts,
+                    'attempts'
+                  )}
+                </td>
+                <td style={{
+                  padding: '4px 2px',
+                  textAlign: 'center',
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: '9px',
+                  borderBottom: '1px solid #dee2e6',
+                  backgroundColor: getPercentileColor(
+                    totalPerGame === 'per_game' ? 
+                    team.rushing_yards_per_game_percentile : 
+                    team.rushing_yards_percentile || 0
+                  ),
+                  width: '14%'
+                }}>
+                  {formatStat(
+                    totalPerGame === 'per_game' ? team.rushing_yards_per_game : team.rushing_yards,
+                    'yards'
+                  )}
+                </td>
+                <td style={{
+                  padding: '4px 2px',
+                  textAlign: 'center',
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: '9px',
+                  borderBottom: '1px solid #dee2e6',
+                  backgroundColor: getPercentileColor(team.yards_per_rush_percentile || 0),
+                  width: '14%'
+                }}>
+                  {formatStat(team.yards_per_rush, 'yards_per_rush')}
+                </td>
+                <td style={{
+                  padding: '4px 2px',
+                  textAlign: 'center',
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: '9px',
+                  borderBottom: '1px solid #dee2e6',
+                  backgroundColor: getPercentileColor(
+                    totalPerGame === 'per_game' ? 
+                    team.rushing_tds_per_game_percentile : 
+                    team.rushing_tds_percentile || 0
+                  ),
+                  width: '10%'
+                }}>
+                  {formatStat(
+                    totalPerGame === 'per_game' ? team.rushing_tds_per_game : team.rushing_tds,
+                    'tds'
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* CSS for responsive design */}
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .desktop-table {
+            display: none !important;
+          }
+          .mobile-table {
+            display: block !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-table {
+            display: none !important;
+          }
+          .desktop-table {
+            display: block !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

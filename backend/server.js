@@ -536,6 +536,8 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
+// Replace the passing stats endpoint in server.js with this corrected version
+
 app.get('/api/leaderboards/passing/:season', async (req, res) => {
   try {
     const { season } = req.params;
@@ -552,16 +554,16 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
     
     // STEP 1: Check if game_team_stats_new table exists and has data
     const tableCheck = await pool.query(`
-      SELECT COUNT(*) as count, MIN(game_id) as min_game, MAX(game_id) as max_game
+      SELECT COUNT(*) as count
       FROM game_team_stats_new 
-      WHERE completions IS NOT NULL
+      WHERE passing_completions IS NOT NULL
     `);
     
     console.log('📋 Table check:', tableCheck.rows[0]);
     
     if (parseInt(tableCheck.rows[0].count) === 0) {
       return res.status(404).json({
-        error: 'No data found in game_team_stats_new table',
+        error: 'No passing data found in game_team_stats_new table',
         details: 'The game_team_stats_new table appears to be empty or missing passing data'
       });
     }
@@ -602,7 +604,7 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
       });
     }
     
-    // STEP 3: Get team stats for those games
+    // STEP 3: Get team stats for those games using correct column names
     let statsQuery;
     
     if (view_type === 'offense') {
@@ -611,11 +613,12 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
         SELECT 
           gts.team,
           COUNT(DISTINCT gts.game_id) as games_played,
-          SUM(COALESCE(gts.completions, 0)) as completions,
-          SUM(COALESCE(gts.attempts, 0)) as attempts,
+          SUM(COALESCE(gts.passing_completions, 0)) as completions,
+          SUM(COALESCE(gts.passing_attempts, 0)) as attempts,
           SUM(COALESCE(gts.net_passing_yards, 0)) as net_passing_yards,
           SUM(COALESCE(gts.passing_tds, 0)) as passing_touchdowns,
-          SUM(COALESCE(gts.interceptions_thrown, 0)) as interceptions
+          SUM(COALESCE(gts.interceptions_thrown, 0)) as interceptions,
+          SUM(COALESCE(gts.sacks_allowed, 0)) as sacks_allowed
         FROM game_team_stats_new gts
         WHERE gts.game_id = ANY($1)
         GROUP BY gts.team
@@ -628,11 +631,12 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
         SELECT 
           gts.team,
           COUNT(DISTINCT gts.game_id) as games_played,
-          SUM(COALESCE(opp.completions, 0)) as completions,
-          SUM(COALESCE(opp.attempts, 0)) as attempts,
+          SUM(COALESCE(opp.passing_completions, 0)) as completions,
+          SUM(COALESCE(opp.passing_attempts, 0)) as attempts,
           SUM(COALESCE(opp.net_passing_yards, 0)) as net_passing_yards,
           SUM(COALESCE(opp.passing_tds, 0)) as passing_touchdowns,
-          SUM(COALESCE(opp.interceptions_thrown, 0)) as interceptions
+          SUM(COALESCE(opp.interceptions_thrown, 0)) as interceptions,
+          SUM(COALESCE(gts.sacks, 0)) as sacks_allowed
         FROM game_team_stats_new gts
         JOIN game_team_stats_new opp ON gts.game_id = opp.game_id AND opp.team != gts.team
         WHERE gts.game_id = ANY($1)
@@ -707,7 +711,7 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
           yards_per_attempt: parseFloat(yards_per_attempt.toFixed(2)),
           passing_touchdowns: parseFloat((parseInt(stat.passing_touchdowns) / divisor).toFixed(1)),
           interceptions: parseFloat((parseInt(stat.interceptions) / divisor).toFixed(1)),
-          sacks_allowed: 0 // We'll add this in a later version
+          sacks_allowed: parseFloat((parseInt(stat.sacks_allowed) / divisor).toFixed(1))
         };
       });
     
@@ -742,49 +746,6 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
       details: err.message,
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       endpoint: '/api/leaderboards/passing/:season'
-    });
-  }
-});
-
-// Add a debug endpoint to check table structure
-app.get('/api/debug/game-team-stats', async (req, res) => {
-  try {
-    // Check table structure
-    const structure = await pool.query(`
-      SELECT column_name, data_type 
-      FROM information_schema.columns 
-      WHERE table_name = 'game_team_stats_new'
-      ORDER BY ordinal_position
-    `);
-    
-    // Check sample data
-    const sample = await pool.query(`
-      SELECT * FROM game_team_stats_new 
-      WHERE completions IS NOT NULL 
-      LIMIT 3
-    `);
-    
-    // Check data counts
-    const counts = await pool.query(`
-      SELECT 
-        COUNT(*) as total_rows,
-        COUNT(DISTINCT team) as unique_teams,
-        COUNT(DISTINCT game_id) as unique_games,
-        COUNT(completions) as rows_with_completions
-      FROM game_team_stats_new
-    `);
-    
-    res.json({
-      table_structure: structure.rows,
-      sample_data: sample.rows,
-      data_counts: counts.rows[0],
-      table_exists: structure.rows.length > 0
-    });
-    
-  } catch (err) {
-    res.status(500).json({
-      error: err.message,
-      table_exists: false
     });
   }
 });

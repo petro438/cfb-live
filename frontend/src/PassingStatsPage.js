@@ -8,13 +8,14 @@ const PassingStatsPage = () => {
   // Filter states
   const [selectedSeason, setSelectedSeason] = useState(2024);
   const [viewType, setViewType] = useState('offense'); // offense or defense
+  const [statCategory, setStatCategory] = useState('basic'); // basic or advanced (for future)
   const [statType, setStatType] = useState('total'); // total or per_game
   const [seasonType, setSeasonType] = useState('regular'); // regular or all
   const [conferenceOnly, setConferenceOnly] = useState(false);
   const [selectedConference, setSelectedConference] = useState('all');
   
   // Sorting state
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'passing_yards', direction: 'desc' });
   
   const [availableConferences, setAvailableConferences] = useState([]);
 
@@ -46,32 +47,24 @@ const PassingStatsPage = () => {
     return '#ea4335'; // Worst
   };
 
-  // Fix logo URLs to use HTTPS
-  const fixLogoUrl = (url) => {
-    if (!url) return 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-    if (url.startsWith('http://')) {
-      return url.replace('http://', 'https://');
-    }
-    return url;
-  };
-
   // Calculate rankings for each stat
   const calculateRankings = (data) => {
     const rankings = {};
     const statFields = [
       'games_played', 'completions', 'attempts', 'completion_percentage',
       'passing_yards', 'yards_per_attempt', 'passing_touchdowns', 
-      'interceptions', 'sacks_allowed', 'qb_hurries'
+      'interceptions', 'sacks_allowed'
     ];
     
     statFields.forEach(field => {
       const sortedTeams = [...data]
         .filter(team => team[field] !== null && team[field] !== undefined)
         .sort((a, b) => {
-          // Higher is better for most stats, lower is better for interceptions and sacks
+          // Lower is better for interceptions and sacks
           if (field === 'interceptions' || field === 'sacks_allowed') {
             return a[field] - b[field];
           }
+          // Higher is better for everything else
           return b[field] - a[field];
         });
       
@@ -167,11 +160,6 @@ const PassingStatsPage = () => {
     return Number(num).toFixed(decimals);
   };
 
-  const formatPercentage = (num) => {
-    if (num === null || num === undefined) return '-';
-    return `${Number(num).toFixed(1)}%`;
-  };
-
   const getSortIcon = (columnKey) => {
     if (sortConfig.key !== columnKey) {
       return <span style={{ color: '#6c757d', marginLeft: '4px' }}>↕</span>;
@@ -195,7 +183,7 @@ const PassingStatsPage = () => {
         fontSize: '13px',
         textAlign: 'center'
       }}>
-        {value}
+        <span style={{ fontFamily: 'Consolas, monospace' }}>{value}</span>
         {isDesktop && ranking && (
           <span style={{
             position: 'absolute',
@@ -254,16 +242,17 @@ const PassingStatsPage = () => {
           fontWeight: 'bold',
           fontSize: '24px',
           margin: '0 0 8px 0',
-          color: '#212529'
+          color: '#212529',
+          textTransform: 'uppercase'
         }}>
-          PASSING STATS
+          {viewType.toUpperCase()} PASSING STATS
         </h1>
         <p style={{ 
           margin: 0, 
           color: '#6c757d',
           fontSize: '14px'
         }}>
-          {viewType === 'offense' ? 'Offensive' : 'Defensive'} passing statistics - {statType === 'total' ? 'Season Totals' : 'Per Game Averages'}
+          {statCategory === 'basic' ? 'Basic' : 'Advanced'} passing statistics - {statType === 'total' ? 'Season Totals' : 'Per Game Averages'}
         </p>
       </div>
 
@@ -275,6 +264,7 @@ const PassingStatsPage = () => {
         gap: '8px',
         alignItems: 'center'
       }}>
+        {/* Season Selector */}
         <select 
           value={selectedSeason} 
           onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
@@ -290,6 +280,7 @@ const PassingStatsPage = () => {
           <option value={2023}>2023 Season</option>
         </select>
 
+        {/* Offense/Defense Toggle */}
         <button
           onClick={() => setViewType(viewType === 'offense' ? 'defense' : 'offense')}
           style={{
@@ -300,12 +291,32 @@ const PassingStatsPage = () => {
             borderRadius: '4px',
             cursor: 'pointer',
             fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontWeight: 'bold'
           }}
         >
-          {viewType === 'offense' ? 'OFFENSE' : 'DEFENSE'}
+          {viewType.toUpperCase()}
         </button>
 
+        {/* Basic/Advanced Toggle */}
+        <button
+          onClick={() => setStatCategory(statCategory === 'basic' ? 'advanced' : 'basic')}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: statCategory === 'basic' ? '#007bff' : '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: 'Trebuchet MS, sans-serif',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}
+        >
+          {statCategory.toUpperCase()} STATS
+        </button>
+
+        {/* Total/Per Game Toggle */}
         <button
           onClick={() => setStatType(statType === 'total' ? 'per_game' : 'total')}
           style={{
@@ -316,12 +327,14 @@ const PassingStatsPage = () => {
             borderRadius: '4px',
             cursor: 'pointer',
             fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontWeight: 'bold'
           }}
         >
           {statType === 'total' ? 'TOTAL' : 'PER GAME'}
         </button>
 
+        {/* Season Type Toggle */}
         <button
           onClick={() => setSeasonType(seasonType === 'regular' ? 'all' : 'regular')}
           style={{
@@ -332,12 +345,14 @@ const PassingStatsPage = () => {
             borderRadius: '4px',
             cursor: 'pointer',
             fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontWeight: 'bold'
           }}
         >
           {seasonType === 'regular' ? 'REGULAR' : 'ALL GAMES'}
         </button>
 
+        {/* Conference Only Toggle */}
         <button
           onClick={() => setConferenceOnly(!conferenceOnly)}
           style={{
@@ -348,12 +363,14 @@ const PassingStatsPage = () => {
             borderRadius: '4px',
             cursor: 'pointer',
             fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontWeight: 'bold'
           }}
         >
           {conferenceOnly ? 'CONF ONLY' : 'ALL GAMES'}
         </button>
 
+        {/* Conference Filter */}
         <select 
           value={selectedConference} 
           onChange={(e) => setSelectedConference(e.target.value)}
@@ -372,14 +389,14 @@ const PassingStatsPage = () => {
         </select>
       </div>
 
-      {/* Debug info */}
+      {/* Results Info */}
       <div style={{ 
         marginBottom: '16px', 
         fontSize: '12px', 
         color: '#6c757d',
         fontFamily: 'Trebuchet MS, sans-serif'
       }}>
-        Showing {sortedTeams.length} teams | View: {viewType} | Type: {statType}
+        Showing {sortedTeams.length} teams
       </div>
 
       {/* Desktop Table */}
@@ -387,17 +404,17 @@ const PassingStatsPage = () => {
         <style>
           {`
             @media (max-width: 767px) {
-              .desktop-only { display: none !important; }
-              .mobile-compact { display: block !important; }
+              .desktop-table { display: none !important; }
+              .mobile-table { display: block !important; }
             }
             @media (min-width: 768px) {
-              .desktop-only { display: block !important; }
-              .mobile-compact { display: none !important; }
+              .desktop-table { display: block !important; }
+              .mobile-table { display: none !important; }
             }
           `}
         </style>
         
-        <table className="desktop-only" style={{ 
+        <table className="desktop-table" style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
           backgroundColor: '#ffffff',
@@ -556,21 +573,6 @@ const PassingStatsPage = () => {
               >
                 SACKS{getSortIcon('sacks_allowed')}
               </th>
-              <th 
-                onClick={() => handleSort('qb_hurries')}
-                style={{
-                  padding: '8px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                QB HURRIES{getSortIcon('qb_hurries')}
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -588,7 +590,7 @@ const PassingStatsPage = () => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <img 
-                      src={fixLogoUrl(team.logo_url)} 
+                      src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
                       alt={team.team}
                       style={{ width: '20px', height: '20px', objectFit: 'contain' }}
                       onError={(e) => {
@@ -605,56 +607,50 @@ const PassingStatsPage = () => {
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.completions)} 
+                  value={formatNumber(team.completions, 1)} 
                   statKey="completions" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.attempts)} 
+                  value={formatNumber(team.attempts, 1)} 
                   statKey="attempts" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatPercentage(team.completion_percentage)} 
+                  value={formatNumber(team.completion_percentage, 1) + '%'} 
                   statKey="completion_percentage" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.passing_yards)} 
+                  value={formatNumber(team.passing_yards, 1)} 
                   statKey="passing_yards" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.yards_per_attempt, 1)} 
+                  value={formatNumber(team.yards_per_attempt, 2)} 
                   statKey="yards_per_attempt" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.passing_touchdowns)} 
+                  value={formatNumber(team.passing_touchdowns, 1)} 
                   statKey="passing_touchdowns" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.interceptions)} 
+                  value={formatNumber(team.interceptions, 1)} 
                   statKey="interceptions" 
                   team={team.team}
                   isDesktop={true}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.sacks_allowed)} 
+                  value={formatNumber(team.sacks_allowed, 1)} 
                   statKey="sacks_allowed" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.qb_hurries)} 
-                  statKey="qb_hurries" 
                   team={team.team}
                   isDesktop={true}
                 />
@@ -664,7 +660,7 @@ const PassingStatsPage = () => {
         </table>
 
         {/* Mobile Table */}
-        <table className="mobile-compact" style={{ 
+        <table className="mobile-table" style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
           backgroundColor: '#ffffff',
@@ -733,7 +729,7 @@ const PassingStatsPage = () => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <img 
-                      src={fixLogoUrl(team.logo_url)} 
+                      src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
                       alt={team.team}
                       style={{ width: '16px', height: '16px', objectFit: 'contain' }}
                       onError={(e) => {
@@ -746,19 +742,19 @@ const PassingStatsPage = () => {
                   </div>
                 </td>
                 <CellWithRank 
-                  value={formatNumber(team.completions)} 
+                  value={formatNumber(team.completions, 1)} 
                   statKey="completions" 
                   team={team.team}
                   isDesktop={false}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.passing_yards)} 
+                  value={formatNumber(team.passing_yards, 1)} 
                   statKey="passing_yards" 
                   team={team.team}
                   isDesktop={false}
                 />
                 <CellWithRank 
-                  value={formatNumber(team.passing_touchdowns)} 
+                  value={formatNumber(team.passing_touchdowns, 1)} 
                   statKey="passing_touchdowns" 
                   team={team.team}
                   isDesktop={false}

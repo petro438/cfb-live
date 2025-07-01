@@ -537,438 +537,208 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
 });
 
 // REPLACE your existing /api/leaderboards/passing/:season endpoint with this FIXED version:
-// REPLACE your current passing endpoint with this COMPLETE FEATURED version:
-
 app.get('/api/leaderboards/passing/:season', async (req, res) => {
   try {
     const { season } = req.params;
-    
-    // Map frontend parameters to backend parameters
     const { 
-      side = 'offense',
-      per_game = 'false',
-      regular_season_only = 'false',
-      conference_only = 'false',
-      conference = null
+      view_type = 'offense',      // offense or defense
+      stat_type = 'total',        // total or per_game
+      season_type = 'regular',    // regular or all
+      conference_only = 'false',  // true or false
+      conference = null           // specific conference filter
     } = req.query;
     
-    // Convert frontend params to backend logic
-    const stat_type = per_game === 'true' ? 'per_game' : 'total';
-    const season_type = regular_season_only === 'true' ? 'regular' : 'all';
+    console.log(`🏈 Fetching passing stats: ${view_type} ${stat_type} for ${season}`);
     
-    console.log(`🏈 Complete passing stats - Season: ${season}, Side: ${side}, Type: ${stat_type}, Season: ${season_type}`);
-    const startTime = Date.now();
+    // Base query - get all games for the season with filters
+    let gameFilters = [];
+    let gameParams = [season];
     
-    let query, queryParams;
+    if (season_type === 'regular') {
+      gameFilters.push(`g.season_type = 'regular'`);
+    }
     
-    if (side === 'offense') {
-      // OFFENSE STATS - Team's own passing
-      query = `
-        WITH unique_offense_games AS (
-          SELECT DISTINCT
-            gts.team,
-            gts.game_id,
-            gts.completions,
-            gts.passing_attempts,
-            gts.net_passing_yards,
-            gts.passing_tds,
-            gts.interceptions_thrown as interceptions,
-            COALESCE(gts.sacks, 0) as sacks,
-            COALESCE(gts.qb_hurries, 0) as qb_hurries,
-            g.season_type,
-            g.conference_game
-          FROM game_team_stats_new gts
-          INNER JOIN games g ON gts.game_id = g.id
-          WHERE gts.season = $1 
-            AND g.completed = true
-      `;
-      queryParams = [season];
-      
-      // Add season type filter
-      if (season_type === 'regular') {
-        query += ` AND g.season_type = 'regular'`;
-      }
-      
-      // Add conference filter
-      if (conference_only === 'true') {
-        query += ` AND g.conference_game = true`;
-      }
-      
-      query += `
-        ),
-        offense_totals AS (
-          SELECT 
-            uog.team,
-            COUNT(*) as games_played,
-            SUM(uog.completions) as total_completions,
-            SUM(uog.passing_attempts) as total_attempts,
-            SUM(uog.net_passing_yards) as total_yards,
-            SUM(uog.passing_tds) as total_tds,
-            SUM(uog.interceptions) as total_interceptions,
-            SUM(uog.sacks) as total_sacks,
-            SUM(uog.qb_hurries) as total_hurries,
-            
-            -- Calculate advanced metrics
-            CASE 
-              WHEN SUM(uog.passing_attempts) > 0 
-              THEN ROUND((SUM(uog.completions)::decimal / SUM(uog.passing_attempts)) * 100, 1)
-              ELSE 0 
-            END as completion_percentage,
-            
-            CASE 
-              WHEN SUM(uog.passing_attempts) > 0 
-              THEN ROUND(SUM(uog.net_passing_yards)::decimal / SUM(uog.passing_attempts), 1)
-              ELSE 0 
-            END as yards_per_attempt,
-            
-            CASE 
-              WHEN SUM(uog.completions) > 0 
-              THEN ROUND(SUM(uog.net_passing_yards)::decimal / SUM(uog.completions), 1)
-              ELSE 0 
-            END as yards_per_completion,
-            
-            -- Per-game calculations
-            ROUND(SUM(uog.completions)::decimal / COUNT(*), 1) as completions_per_game,
-            ROUND(SUM(uog.passing_attempts)::decimal / COUNT(*), 1) as attempts_per_game,
-            ROUND(SUM(uog.net_passing_yards)::decimal / COUNT(*), 1) as yards_per_game,
-            ROUND(SUM(uog.passing_tds)::decimal / COUNT(*), 1) as tds_per_game,
-            ROUND(SUM(uog.interceptions)::decimal / COUNT(*), 1) as interceptions_per_game,
-            ROUND(SUM(uog.sacks)::decimal / COUNT(*), 1) as sacks_per_game,
-            ROUND(SUM(uog.qb_hurries)::decimal / COUNT(*), 1) as hurries_per_game,
-            
-            -- Efficiency ratios
-            CASE 
-              WHEN SUM(uog.interceptions) > 0 
-              THEN ROUND(SUM(uog.passing_tds)::decimal / SUM(uog.interceptions), 2)
-              ELSE SUM(uog.passing_tds)
-            END as td_int_ratio,
-            
-            CASE 
-              WHEN COUNT(*) > 0 
-              THEN ROUND((SUM(uog.sacks)::decimal + SUM(uog.qb_hurries)) / COUNT(*), 1)
-              ELSE 0 
-            END as pressure_per_game
-            
-          FROM unique_offense_games uog
-          GROUP BY uog.team
-          HAVING COUNT(*) >= 8  -- Teams must have played at least 8 games
-        )
+    if (conference_only === 'true') {
+      gameFilters.push(`g.conference_game = true`);
+    }
+    
+    const gameWhereClause = gameFilters.length > 0 ? 
+      `AND ${gameFilters.join(' AND ')}` : '';
+    
+    // For OFFENSE: get stats for the team directly
+    // For DEFENSE: get stats for opponents (inverse)
+    let mainQuery;
+    
+    if (view_type === 'offense') {
+      mainQuery = `
         SELECT 
-          ot.team as team_name,
-          t.logo_url,
-          t.conference,
-          t.classification,
-          ot.games_played,
-          ot.total_completions,
-          ot.total_attempts,
-          ot.total_yards,
-          ot.total_tds,
-          ot.total_interceptions,
-          ot.total_sacks,
-          ot.total_hurries,
-          ot.completion_percentage,
-          ot.yards_per_attempt,
-          ot.yards_per_completion,
-          ot.completions_per_game,
-          ot.attempts_per_game,
-          ot.yards_per_game,
-          ot.tds_per_game,
-          ot.interceptions_per_game,
-          ot.sacks_per_game,
-          ot.hurries_per_game,
-          ot.td_int_ratio,
-          ot.pressure_per_game
-        FROM offense_totals ot
-        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(ot.team))
-        WHERE t.classification = 'fbs'
+          gts.team,
+          COUNT(DISTINCT g.id) as games_played,
+          SUM(gts.completions) as completions,
+          SUM(gts.attempts) as attempts,
+          CASE 
+            WHEN SUM(gts.attempts) > 0 
+            THEN (SUM(gts.completions)::float / SUM(gts.attempts)::float) * 100 
+            ELSE 0 
+          END as completion_percentage,
+          SUM(gts.net_passing_yards) as net_passing_yards,
+          CASE 
+            WHEN SUM(gts.attempts) > 0 
+            THEN SUM(gts.net_passing_yards)::float / SUM(gts.attempts)::float 
+            ELSE 0 
+          END as yards_per_attempt,
+          SUM(gts.passing_tds) as passing_touchdowns,
+          SUM(gts.interceptions_thrown) as interceptions,
+          -- For offense sacks, we need opponent sacks allowed to this team
+          COALESCE(SUM(opp_gts.sacks), 0) as sacks_taken
+        FROM game_team_stats_new gts
+        JOIN games g ON gts.game_id = g.id
+        LEFT JOIN game_team_stats_new opp_gts ON gts.game_id = opp_gts.game_id 
+          AND opp_gts.team != gts.team
+        WHERE g.season = $1 
+          AND g.completed = true
+          ${gameWhereClause}
+        GROUP BY gts.team
       `;
-      
     } else {
-      // DEFENSE STATS - Opponent passing allowed
-      query = `
-        WITH unique_defense_games AS (
-          SELECT DISTINCT
-            CASE 
-              WHEN g.home_team = gts.team THEN g.away_team
-              ELSE g.home_team
-            END as defense_team,
-            gts.game_id,
-            gts.completions,
-            gts.passing_attempts,
-            gts.net_passing_yards,
-            gts.passing_tds,
-            gts.interceptions_thrown as interceptions,
-            COALESCE(gts.sacks, 0) as sacks,
-            COALESCE(gts.qb_hurries, 0) as qb_hurries,
-            g.season_type,
-            g.conference_game
-          FROM game_team_stats_new gts
-          INNER JOIN games g ON gts.game_id = g.id
-          WHERE gts.season = $1 
-            AND g.completed = true
-      `;
-      queryParams = [season];
-      
-      // Add season type filter
-      if (season_type === 'regular') {
-        query += ` AND g.season_type = 'regular'`;
-      }
-      
-      // Add conference filter
-      if (conference_only === 'true') {
-        query += ` AND g.conference_game = true`;
-      }
-      
-      query += `
-        ),
-        defense_totals AS (
-          SELECT 
-            udg.defense_team as team,
-            COUNT(*) as games_played,
-            SUM(udg.completions) as total_completions_allowed,
-            SUM(udg.passing_attempts) as total_attempts_allowed,
-            SUM(udg.net_passing_yards) as total_yards_allowed,
-            SUM(udg.passing_tds) as total_tds_allowed,
-            SUM(udg.interceptions) as total_interceptions_forced,
-            SUM(udg.sacks) as total_sacks_allowed,
-            SUM(udg.qb_hurries) as total_hurries_allowed,
-            
-            -- Calculate defensive metrics (allowing)
-            CASE 
-              WHEN SUM(udg.passing_attempts) > 0 
-              THEN ROUND((SUM(udg.completions)::decimal / SUM(udg.passing_attempts)) * 100, 1)
-              ELSE 0 
-            END as completion_percentage_allowed,
-            
-            CASE 
-              WHEN SUM(udg.passing_attempts) > 0 
-              THEN ROUND(SUM(udg.net_passing_yards)::decimal / SUM(udg.passing_attempts), 1)
-              ELSE 0 
-            END as yards_per_attempt_allowed,
-            
-            CASE 
-              WHEN SUM(udg.completions) > 0 
-              THEN ROUND(SUM(udg.net_passing_yards)::decimal / SUM(udg.completions), 1)
-              ELSE 0 
-            END as yards_per_completion_allowed,
-            
-            -- Per-game calculations (defense perspective)
-            ROUND(SUM(udg.completions)::decimal / COUNT(*), 1) as completions_per_game_allowed,
-            ROUND(SUM(udg.passing_attempts)::decimal / COUNT(*), 1) as attempts_per_game_allowed,
-            ROUND(SUM(udg.net_passing_yards)::decimal / COUNT(*), 1) as yards_per_game_allowed,
-            ROUND(SUM(udg.passing_tds)::decimal / COUNT(*), 1) as tds_per_game_allowed,
-            ROUND(SUM(udg.interceptions)::decimal / COUNT(*), 1) as interceptions_per_game_forced,
-            ROUND(SUM(udg.sacks)::decimal / COUNT(*), 1) as sacks_per_game_allowed,
-            ROUND(SUM(udg.qb_hurries)::decimal / COUNT(*), 1) as hurries_per_game_allowed,
-            
-            -- Defensive efficiency ratios
-            CASE 
-              WHEN SUM(udg.passing_tds) > 0 
-              THEN ROUND(SUM(udg.interceptions)::decimal / SUM(udg.passing_tds), 2)
-              ELSE SUM(udg.interceptions)
-            END as int_td_ratio,
-            
-            CASE 
-              WHEN COUNT(*) > 0 
-              THEN ROUND((SUM(udg.sacks)::decimal + SUM(udg.qb_hurries)) / COUNT(*), 1)
-              ELSE 0 
-            END as pressure_per_game_generated
-            
-          FROM unique_defense_games udg
-          GROUP BY udg.defense_team
-          HAVING COUNT(*) >= 8  -- Teams must have played at least 8 games
-        )
+      // DEFENSE: get opponent passing stats (what we allowed)
+      mainQuery = `
         SELECT 
-          dt.team as team_name,
-          t.logo_url,
-          t.conference,
-          t.classification,
-          dt.games_played,
-          dt.total_completions_allowed as total_completions,
-          dt.total_attempts_allowed as total_attempts,
-          dt.total_yards_allowed as total_yards,
-          dt.total_tds_allowed as total_tds,
-          dt.total_interceptions_forced as total_interceptions,
-          dt.total_sacks_allowed as total_sacks,
-          dt.total_hurries_allowed as total_hurries,
-          dt.completion_percentage_allowed as completion_percentage,
-          dt.yards_per_attempt_allowed as yards_per_attempt,
-          dt.yards_per_completion_allowed as yards_per_completion,
-          dt.completions_per_game_allowed as completions_per_game,
-          dt.attempts_per_game_allowed as attempts_per_game,
-          dt.yards_per_game_allowed as yards_per_game,
-          dt.tds_per_game_allowed as tds_per_game,
-          dt.interceptions_per_game_forced as interceptions_per_game,
-          dt.sacks_per_game_allowed as sacks_per_game,
-          dt.hurries_per_game_allowed as hurries_per_game,
-          dt.int_td_ratio as td_int_ratio,
-          dt.pressure_per_game_generated as pressure_per_game
-        FROM defense_totals dt
-        LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(dt.team))
-        WHERE t.classification = 'fbs'
+          gts.team,
+          COUNT(DISTINCT g.id) as games_played,
+          SUM(opp_gts.completions) as completions,
+          SUM(opp_gts.attempts) as attempts,
+          CASE 
+            WHEN SUM(opp_gts.attempts) > 0 
+            THEN (SUM(opp_gts.completions)::float / SUM(opp_gts.attempts)::float) * 100 
+            ELSE 0 
+          END as completion_percentage,
+          SUM(opp_gts.net_passing_yards) as net_passing_yards,
+          CASE 
+            WHEN SUM(opp_gts.attempts) > 0 
+            THEN SUM(opp_gts.net_passing_yards)::float / SUM(opp_gts.attempts)::float 
+            ELSE 0 
+          END as yards_per_attempt,
+          SUM(opp_gts.passing_tds) as passing_touchdowns,
+          SUM(opp_gts.interceptions_thrown) as interceptions,
+          -- For defense, sacks are what we recorded (our sacks)
+          SUM(gts.sacks) as sacks_allowed
+        FROM game_team_stats_new gts
+        JOIN games g ON gts.game_id = g.id
+        JOIN game_team_stats_new opp_gts ON gts.game_id = opp_gts.game_id 
+          AND opp_gts.team != gts.team
+        WHERE g.season = $1 
+          AND g.completed = true
+          ${gameWhereClause}
+        GROUP BY gts.team
       `;
     }
     
-    // Add conference filter
+    // Add conference filter if specified
     if (conference && conference !== 'all') {
-      query += ` AND t.conference = $${queryParams.length + 1}`;
-      queryParams.push(conference);
+      mainQuery += ` HAVING gts.team IN (
+        SELECT school FROM teams WHERE conference = $${gameParams.length + 1}
+      )`;
+      gameParams.push(conference);
     }
     
-    // Add ordering based on stat_type and side
-    if (side === 'offense') {
-      query += stat_type === 'per_game' ? 
-        ` ORDER BY yards_per_game DESC` : 
-        ` ORDER BY total_yards DESC`;
-    } else {
-      query += stat_type === 'per_game' ? 
-        ` ORDER BY yards_per_game ASC` : 
-        ` ORDER BY total_yards ASC`;
-    }
+    mainQuery += ` ORDER BY gts.team`;
     
-    console.log(`🔍 Executing complete query with ${queryParams.length} parameters`);
+    console.log('🔍 Executing query:', mainQuery);
+    console.log('📊 Parameters:', gameParams);
     
-    const result = await pool.query(query, queryParams);
+    const statsResult = await pool.query(mainQuery, gameParams);
+    const rawStats = statsResult.rows;
     
-    // Process results with full feature set
-    const teams = result.rows.map(team => {
-      const processedTeam = {
-        ...team,
-        // Convert string numbers to actual numbers
-        games_played: parseInt(team.games_played),
-        total_completions: parseInt(team.total_completions),
-        total_attempts: parseInt(team.total_attempts),
-        total_yards: parseInt(team.total_yards),
-        total_tds: parseInt(team.total_tds),
-        total_interceptions: parseInt(team.total_interceptions),
-        total_sacks: parseInt(team.total_sacks),
-        total_hurries: parseInt(team.total_hurries),
-        completion_percentage: parseFloat(team.completion_percentage),
-        yards_per_attempt: parseFloat(team.yards_per_attempt),
-        yards_per_completion: parseFloat(team.yards_per_completion || 0),
-        completions_per_game: parseFloat(team.completions_per_game),
-        attempts_per_game: parseFloat(team.attempts_per_game),
-        yards_per_game: parseFloat(team.yards_per_game),
-        tds_per_game: parseFloat(team.tds_per_game),
-        interceptions_per_game: parseFloat(team.interceptions_per_game),
-        sacks_per_game: parseFloat(team.sacks_per_game),
-        hurries_per_game: parseFloat(team.hurries_per_game),
-        td_int_ratio: parseFloat(team.td_int_ratio || 0),
-        pressure_per_game: parseFloat(team.pressure_per_game || 0)
-      };
-      
-      // Set display values based on stat_type
-      if (stat_type === 'per_game') {
-        processedTeam.display_completions = processedTeam.completions_per_game;
-        processedTeam.display_attempts = processedTeam.attempts_per_game;
-        processedTeam.display_yards = processedTeam.yards_per_game;
-        processedTeam.display_tds = processedTeam.tds_per_game;
-        processedTeam.display_interceptions = processedTeam.interceptions_per_game;
-        processedTeam.display_sacks = processedTeam.sacks_per_game;
-        processedTeam.display_hurries = processedTeam.hurries_per_game;
-      } else {
-        processedTeam.display_completions = processedTeam.total_completions;
-        processedTeam.display_attempts = processedTeam.total_attempts;
-        processedTeam.display_yards = processedTeam.total_yards;
-        processedTeam.display_tds = processedTeam.total_tds;
-        processedTeam.display_interceptions = processedTeam.total_interceptions;
-        processedTeam.display_sacks = processedTeam.total_sacks;
-        processedTeam.display_hurries = processedTeam.total_hurries;
-      }
-      
-      return processedTeam;
-    });
+    console.log(`📈 Found ${rawStats.length} teams with raw stats`);
     
-    // Add comprehensive rankings and percentiles
-    const addRankingsAndPercentiles = (teams, statField, ascending = false) => {
-      // Determine sort order based on side and stat type
-      let sortOrder = ascending;
-      if (side === 'defense') {
-        // For defense, lower numbers are better (except interceptions/sacks/hurries)
-        if (!['interceptions', 'sacks', 'hurries', 'pressure', 'td_int_ratio'].some(good => statField.includes(good))) {
-          sortOrder = true; // ascending for defense on most stats
+    if (rawStats.length === 0) {
+      return res.json({
+        teams: [],
+        metadata: {
+          season: parseInt(season),
+          view_type,
+          stat_type,
+          season_type,
+          conference_only: conference_only === 'true',
+          conference,
+          total_teams: 0,
+          message: 'No data found for the specified filters'
         }
-      }
-      
-      const sorted = [...teams].sort((a, b) => 
-        sortOrder ? a[statField] - b[statField] : b[statField] - a[statField]
-      );
-      
-      teams.forEach(team => {
-        const rank = sorted.findIndex(t => t.team_name === team.team_name) + 1;
-        const percentile = ((teams.length - rank + 1) / teams.length * 100);
-        
-        team[`${statField}_rank`] = rank;
-        team[`${statField}_percentile`] = parseFloat(percentile.toFixed(1));
       });
-    };
-    
-    // Add rankings for all stats
-    const statsToRank = [
-      'display_completions', 'display_attempts', 'display_yards', 'display_tds',
-      'completion_percentage', 'yards_per_attempt', 'yards_per_completion',
-      'td_int_ratio', 'pressure_per_game'
-    ];
-    
-    statsToRank.forEach(stat => {
-      addRankingsAndPercentiles(teams, stat);
-    });
-    
-    // Special handling for "bad" stats
-    if (side === 'offense') {
-      addRankingsAndPercentiles(teams, 'display_interceptions', true); // ascending for offense
-      addRankingsAndPercentiles(teams, 'display_sacks', true);
-      addRankingsAndPercentiles(teams, 'display_hurries', true);
-    } else {
-      addRankingsAndPercentiles(teams, 'display_interceptions'); // descending for defense
-      addRankingsAndPercentiles(teams, 'display_sacks');
-      addRankingsAndPercentiles(teams, 'display_hurries');
     }
     
-    // Add overall rank (based on primary sort)
-    teams.forEach((team, index) => {
-      team.overall_rank = index + 1;
+    // Get team info (logos, conferences, etc.)
+    const teamNames = rawStats.map(stat => stat.team);
+    const teamInfoQuery = `
+      SELECT school, conference, logo_url, color, alt_color
+      FROM teams 
+      WHERE school = ANY($1)
+    `;
+    
+    const teamInfoResult = await pool.query(teamInfoQuery, [teamNames]);
+    const teamInfoMap = {};
+    teamInfoResult.rows.forEach(team => {
+      teamInfoMap[team.school] = team;
     });
     
-    const executionTime = Date.now() - startTime;
-    console.log(`✅ Complete passing stats: ${teams.length} FBS teams in ${executionTime}ms`);
+    // Process stats and apply per-game calculation if needed
+    const processedTeams = rawStats.map(stat => {
+      const teamInfo = teamInfoMap[stat.team] || {};
+      const gamesPlayed = parseInt(stat.games_played) || 1;
+      
+      // For per-game stats, divide by games played
+      const divisor = stat_type === 'per_game' ? gamesPlayed : 1;
+      
+      return {
+        team: stat.team,
+        conference: teamInfo.conference || 'Unknown',
+        logo_url: teamInfo.logo_url || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png',
+        primary_color: teamInfo.color,
+        secondary_color: teamInfo.alt_color,
+        games_played: gamesPlayed,
+        completions: parseFloat((stat.completions / divisor).toFixed(1)),
+        attempts: parseFloat((stat.attempts / divisor).toFixed(1)),
+        completion_percentage: parseFloat(stat.completion_percentage.toFixed(1)),
+        passing_yards: parseFloat((stat.net_passing_yards / divisor).toFixed(1)),
+        yards_per_attempt: parseFloat(stat.yards_per_attempt.toFixed(2)),
+        passing_touchdowns: parseFloat((stat.passing_touchdowns / divisor).toFixed(1)),
+        interceptions: parseFloat((stat.interceptions / divisor).toFixed(1)),
+        sacks_allowed: view_type === 'offense' ? 
+          parseFloat((stat.sacks_taken / divisor).toFixed(1)) :
+          parseFloat((stat.sacks_allowed / divisor).toFixed(1))
+      };
+    });
     
-    // Debug verification
-    const sampleTeam = teams.find(t => t.team_name === 'Ole Miss');
-    if (sampleTeam) {
-      console.log(`✅ Ole Miss verification: ${sampleTeam.display_completions} completions, ${sampleTeam.games_played} games, ${sampleTeam.yards_per_attempt} YPA`);
-    }
+    // Filter to only FBS teams
+    const fbsTeams = processedTeams.filter(team => {
+      const teamInfo = teamInfoMap[team.team];
+      return teamInfo && teamInfo.conference; // Only teams with conferences (FBS)
+    });
+    
+    console.log(`✅ Returning ${fbsTeams.length} FBS teams`);
     
     res.json({
-      teams: teams,
+      teams: fbsTeams,
       metadata: {
         season: parseInt(season),
-        side: side,
-        stat_type: stat_type,
-        season_type: season_type,
+        view_type,
+        stat_type,
+        season_type,
         conference_only: conference_only === 'true',
-        conference_filter: conference,
-        total_teams: teams.length,
-        execution_time_ms: executionTime,
-        generated_at: new Date().toISOString(),
-        features: [
-          'Complete rankings and percentiles',
-          'Advanced efficiency metrics',
-          'TD/INT ratios',
-          'Pressure statistics',
-          'Yards per completion',
-          'FBS teams only',
-          'Proper offense/defense differentiation'
-        ]
+        conference,
+        total_teams: fbsTeams.length,
+        raw_teams_found: rawStats.length,
+        generated_at: new Date().toISOString()
       }
     });
     
-  } catch (error) {
-    console.error('❌ Complete passing stats error:', error);
+  } catch (err) {
+    console.error('❌ Error in passing stats endpoint:', err);
     res.status(500).json({ 
-      error: 'Failed to fetch complete passing stats', 
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: 'Internal server error', 
+      details: err.message,
+      endpoint: '/api/leaderboards/passing/:season'
     });
   }
 });

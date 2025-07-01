@@ -46,6 +46,15 @@ const PassingStatsPage = () => {
     return '#ea4335'; // Worst
   };
 
+  // Fix logo URLs to use HTTPS
+  const fixLogoUrl = (url) => {
+    if (!url) return 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+    if (url.startsWith('http://')) {
+      return url.replace('http://', 'https://');
+    }
+    return url;
+  };
+
   // Calculate rankings for each stat
   const calculateRankings = (data) => {
     const rankings = {};
@@ -100,6 +109,9 @@ const PassingStatsPage = () => {
       }
       
       const data = await response.json();
+      
+      console.log('API Response:', data); // Debug log
+      
       setTeams(data.teams || []);
       
       // Extract unique conferences for filter
@@ -360,25 +372,32 @@ const PassingStatsPage = () => {
         </select>
       </div>
 
-      {/* Desktop Table */}
-      <div className="desktop-table" style={{ 
-        display: 'none',
-        '@media (min-width: 768px)': { display: 'block' }
+      {/* Debug info */}
+      <div style={{ 
+        marginBottom: '16px', 
+        fontSize: '12px', 
+        color: '#6c757d',
+        fontFamily: 'Trebuchet MS, sans-serif'
       }}>
+        Showing {sortedTeams.length} teams | View: {viewType} | Type: {statType}
+      </div>
+
+      {/* Desktop Table */}
+      <div style={{ display: 'block' }}>
         <style>
           {`
-            @media (min-width: 768px) {
-              .desktop-table { display: block !important; }
-              .mobile-table { display: none !important; }
-            }
             @media (max-width: 767px) {
-              .desktop-table { display: none !important; }
-              .mobile-table { display: block !important; }
+              .desktop-only { display: none !important; }
+              .mobile-compact { display: block !important; }
+            }
+            @media (min-width: 768px) {
+              .desktop-only { display: block !important; }
+              .mobile-compact { display: none !important; }
             }
           `}
         </style>
         
-        <table style={{ 
+        <table className="desktop-only" style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
           backgroundColor: '#ffffff',
@@ -555,10 +574,9 @@ const PassingStatsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {sortedTeams.map((team) => (
+            {sortedTeams.map((team, index) => (
               <tr key={team.team} style={{ 
-                backgroundColor: '#ffffff',
-                ':nth-child(even)': { backgroundColor: '#f8f9fa' }
+                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
               }}>
                 <td style={{
                   padding: '8px',
@@ -569,13 +587,14 @@ const PassingStatsPage = () => {
                   textTransform: 'uppercase'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {team.logo_url && (
-                      <img 
-                        src={team.logo_url} 
-                        alt={team.team}
-                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-                      />
-                    )}
+                    <img 
+                      src={fixLogoUrl(team.logo_url)} 
+                      alt={team.team}
+                      style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                      }}
+                    />
                     {team.team}
                   </div>
                 </td>
@@ -643,11 +662,9 @@ const PassingStatsPage = () => {
             ))}
           </tbody>
         </table>
-      </div>
 
-      {/* Mobile Table */}
-      <div className="mobile-table">
-        <table style={{ 
+        {/* Mobile Table */}
+        <table className="mobile-compact" style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
           backgroundColor: '#ffffff',
@@ -656,7 +673,7 @@ const PassingStatsPage = () => {
           <thead>
             <tr style={{ backgroundColor: '#f8f9fa' }}>
               <th style={{
-                padding: '8px',
+                padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
                 fontSize: '11px',
@@ -667,7 +684,7 @@ const PassingStatsPage = () => {
                 TEAM
               </th>
               <th style={{
-                padding: '8px',
+                padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
                 fontSize: '11px',
@@ -678,7 +695,7 @@ const PassingStatsPage = () => {
                 COMP
               </th>
               <th style={{
-                padding: '8px',
+                padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
                 fontSize: '11px',
@@ -689,7 +706,7 @@ const PassingStatsPage = () => {
                 YDS
               </th>
               <th style={{
-                padding: '8px',
+                padding: '6px',
                 border: '1px solid #dee2e6',
                 fontFamily: 'Trebuchet MS, sans-serif',
                 fontSize: '11px',
@@ -702,25 +719,28 @@ const PassingStatsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {sortedTeams.map((team) => (
-              <tr key={team.team}>
+            {sortedTeams.map((team, index) => (
+              <tr key={`mobile-${team.team}`} style={{ 
+                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+              }}>
                 <td style={{
-                  padding: '8px',
+                  padding: '6px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {team.logo_url && (
-                      <img 
-                        src={team.logo_url} 
-                        alt={team.team}
-                        style={{ width: '16px', height: '16px', objectFit: 'contain' }}
-                      />
-                    )}
-                    <span style={{ fontSize: '11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <img 
+                      src={fixLogoUrl(team.logo_url)} 
+                      alt={team.team}
+                      style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                      }}
+                    />
+                    <span style={{ fontSize: '10px' }}>
                       {team.team?.length > 8 ? team.team.substring(0, 8) + '...' : team.team}
                     </span>
                   </div>
@@ -747,16 +767,6 @@ const PassingStatsPage = () => {
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Results count */}
-      <div style={{ 
-        marginTop: '16px', 
-        fontSize: '12px', 
-        color: '#6c757d',
-        fontFamily: 'Trebuchet MS, sans-serif'
-      }}>
-        Showing {sortedTeams.length} teams
       </div>
     </div>
   );

@@ -18,35 +18,8 @@ pool.connect((err, client, release) => {
   }
 });
 
-class StatsCalculator {
+class SOSCalculator {
   
-  // Helper function for normal distribution CDF
-  normalCDF(x, mean = 0, stdDev = 1) {
-    const z = (x - mean) / stdDev;
-    const t = 1 / (1 + 0.2316419 * Math.abs(z));
-    const d = 0.3989423 * Math.exp(-z * z / 2);
-    let prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-    if (z > 0) prob = 1 - prob;
-    return prob;
-  }
-
-  // Convert moneyline to probability
-  moneylineToProbability(moneyline) {
-    if (!moneyline || moneyline === null) return null;
-    
-    if (moneyline > 0) {
-      return 1 / (moneyline / 100 + 1);
-    } else {
-      return 1 / (1 + 100 / Math.abs(moneyline));
-    }
-  }
-
-  // Convert spread to probability using normal distribution
-  spreadToProbability(spread) {
-    // Use NORM.DIST with 13.5 standard deviation
-    return this.normalCDF(-spread, 0, 13.5);
-  }
-
   async calculateAllSOS(season = 2024) {
     console.log(`🔍 Starting SOS calculation for ${season}...`);
     
@@ -87,65 +60,94 @@ class StatsCalculator {
         const conferenceOnly = await this.calculateTeamSOS(team.team_name, season, false, true); // Conference games only
         const confRegular = await this.calculateTeamSOS(team.team_name, season, true, true); // Conference + Regular season
         
-        // Insert into database with all filter combinations
+        // Insert into database with all filter combinations (REMOVED projected_wins columns)
         await pool.query(`
           INSERT INTO strength_of_schedule (
             team_name, season, classification, 
             
-            -- All games
+            -- All games (removed projected_wins columns)
             sos_overall, sos_played, sos_remaining,
-            actual_wins, actual_losses, projected_wins, win_difference,
-            top40_wins, top40_games, coinflip_games, sure_thing_games, longshot_games,
+            actual_wins, actual_losses, win_difference,
+            top40_wins, top40_games, top40_wins_played, top40_games_played, top40_wins_remaining, top40_games_remaining,
+            coinflip_games, coinflip_games_played, coinflip_games_remaining,
+            sure_thing_games, sure_thing_games_played, sure_thing_games_remaining,
+            longshot_games, longshot_games_played, longshot_games_remaining,
             games_played, games_remaining,
             
             -- Regular season only
             sos_overall_regular, sos_played_regular, sos_remaining_regular,
-            actual_wins_regular, actual_losses_regular, projected_wins_regular, win_difference_regular,
-            top40_wins_regular, top40_games_regular, coinflip_games_regular, sure_thing_games_regular, longshot_games_regular,
+            actual_wins_regular, actual_losses_regular, win_difference_regular,
+            top40_wins_regular, top40_games_regular, top40_wins_played_regular, top40_games_played_regular, top40_wins_remaining_regular, top40_games_remaining_regular,
+            coinflip_games_regular, coinflip_games_played_regular, coinflip_games_remaining_regular,
+            sure_thing_games_regular, sure_thing_games_played_regular, sure_thing_games_remaining_regular,
+            longshot_games_regular, longshot_games_played_regular, longshot_games_remaining_regular,
             games_played_regular, games_remaining_regular,
             
             -- Conference games only
             sos_overall_conference, sos_played_conference, sos_remaining_conference,
-            actual_wins_conference, actual_losses_conference, projected_wins_conference, win_difference_conference,
-            top40_wins_conference, top40_games_conference, coinflip_games_conference, sure_thing_games_conference, longshot_games_conference,
+            actual_wins_conference, actual_losses_conference, win_difference_conference,
+            top40_wins_conference, top40_games_conference, top40_wins_played_conference, top40_games_played_conference, top40_wins_remaining_conference, top40_games_remaining_conference,
+            coinflip_games_conference, coinflip_games_played_conference, coinflip_games_remaining_conference,
+            sure_thing_games_conference, sure_thing_games_played_conference, sure_thing_games_remaining_conference,
+            longshot_games_conference, longshot_games_played_conference, longshot_games_remaining_conference,
             games_played_conference, games_remaining_conference,
             
             -- Conference + Regular season
             sos_overall_conf_reg, sos_played_conf_reg, sos_remaining_conf_reg,
-            actual_wins_conf_reg, actual_losses_conf_reg, projected_wins_conf_reg, win_difference_conf_reg,
-            top40_wins_conf_reg, top40_games_conf_reg, coinflip_games_conf_reg, sure_thing_games_conf_reg, longshot_games_conf_reg,
+            actual_wins_conf_reg, actual_losses_conf_reg, win_difference_conf_reg,
+            top40_wins_conf_reg, top40_games_conf_reg, top40_wins_played_conf_reg, top40_games_played_conf_reg, top40_wins_remaining_conf_reg, top40_games_remaining_conf_reg,
+            coinflip_games_conf_reg, coinflip_games_played_conf_reg, coinflip_games_remaining_conf_reg,
+            sure_thing_games_conf_reg, sure_thing_games_played_conf_reg, sure_thing_games_remaining_conf_reg,
+            longshot_games_conf_reg, longshot_games_played_conf_reg, longshot_games_remaining_conf_reg,
             games_played_conf_reg, games_remaining_conf_reg,
             
             last_updated
           ) VALUES (
             $1, $2, $3,
-            $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31,
-            $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45,
-            $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59,
+            -- All games (22 values instead of 26)
+            $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+            -- Regular season only (22 values)
+            $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47,
+            -- Conference games only (22 values)
+            $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69,
+            -- Conference + Regular season (22 values)
+            $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81, $82, $83, $84, $85, $86, $87, $88, $89, $90, $91,
+            -- Last updated
             NOW()
           )
         `, [
           team.team_name, season, 'fbs',
-          // All games
+          // All games (removed projected_wins values)
           allGames.sos_overall, allGames.sos_played, allGames.sos_remaining,
-          allGames.actual_wins, allGames.actual_losses, allGames.projected_wins, allGames.win_difference,
-          allGames.top40_wins, allGames.top40_games, allGames.coinflip_games, allGames.sure_thing_games, allGames.longshot_games,
+          allGames.actual_wins, allGames.actual_losses, allGames.win_difference,
+          allGames.top40_wins, allGames.top40_games, allGames.top40_wins_played, allGames.top40_games_played, allGames.top40_wins_remaining, allGames.top40_games_remaining,
+          allGames.coinflip_games, allGames.coinflip_games_played, allGames.coinflip_games_remaining,
+          allGames.sure_thing_games, allGames.sure_thing_games_played, allGames.sure_thing_games_remaining,
+          allGames.longshot_games, allGames.longshot_games_played, allGames.longshot_games_remaining,
           allGames.games_played, allGames.games_remaining,
           // Regular season only
           regularSeason.sos_overall, regularSeason.sos_played, regularSeason.sos_remaining,
-          regularSeason.actual_wins, regularSeason.actual_losses, regularSeason.projected_wins, regularSeason.win_difference,
-          regularSeason.top40_wins, regularSeason.top40_games, regularSeason.coinflip_games, regularSeason.sure_thing_games, regularSeason.longshot_games,
+          regularSeason.actual_wins, regularSeason.actual_losses, regularSeason.win_difference,
+          regularSeason.top40_wins, regularSeason.top40_games, regularSeason.top40_wins_played, regularSeason.top40_games_played, regularSeason.top40_wins_remaining, regularSeason.top40_games_remaining,
+          regularSeason.coinflip_games, regularSeason.coinflip_games_played, regularSeason.coinflip_games_remaining,
+          regularSeason.sure_thing_games, regularSeason.sure_thing_games_played, regularSeason.sure_thing_games_remaining,
+          regularSeason.longshot_games, regularSeason.longshot_games_played, regularSeason.longshot_games_remaining,
           regularSeason.games_played, regularSeason.games_remaining,
           // Conference games only
           conferenceOnly.sos_overall, conferenceOnly.sos_played, conferenceOnly.sos_remaining,
-          conferenceOnly.actual_wins, conferenceOnly.actual_losses, conferenceOnly.projected_wins, conferenceOnly.win_difference,
-          conferenceOnly.top40_wins, conferenceOnly.top40_games, conferenceOnly.coinflip_games, conferenceOnly.sure_thing_games, conferenceOnly.longshot_games,
+          conferenceOnly.actual_wins, conferenceOnly.actual_losses, conferenceOnly.win_difference,
+          conferenceOnly.top40_wins, conferenceOnly.top40_games, conferenceOnly.top40_wins_played, conferenceOnly.top40_games_played, conferenceOnly.top40_wins_remaining, conferenceOnly.top40_games_remaining,
+          conferenceOnly.coinflip_games, conferenceOnly.coinflip_games_played, conferenceOnly.coinflip_games_remaining,
+          conferenceOnly.sure_thing_games, conferenceOnly.sure_thing_games_played, conferenceOnly.sure_thing_games_remaining,
+          conferenceOnly.longshot_games, conferenceOnly.longshot_games_played, conferenceOnly.longshot_games_remaining,
           conferenceOnly.games_played, conferenceOnly.games_remaining,
           // Conference + Regular season
           confRegular.sos_overall, confRegular.sos_played, confRegular.sos_remaining,
-          confRegular.actual_wins, confRegular.actual_losses, confRegular.projected_wins, confRegular.win_difference,
-          confRegular.top40_wins, confRegular.top40_games, confRegular.coinflip_games, confRegular.sure_thing_games, confRegular.longshot_games,
+          confRegular.actual_wins, confRegular.actual_losses, confRegular.win_difference,
+          confRegular.top40_wins, confRegular.top40_games, confRegular.top40_wins_played, confRegular.top40_games_played, confRegular.top40_wins_remaining, confRegular.top40_games_remaining,
+          confRegular.coinflip_games, confRegular.coinflip_games_played, confRegular.coinflip_games_remaining,
+          confRegular.sure_thing_games, confRegular.sure_thing_games_played, confRegular.sure_thing_games_remaining,
+          confRegular.longshot_games, confRegular.longshot_games_played, confRegular.longshot_games_remaining,
           confRegular.games_played, confRegular.games_remaining
         ]);
       }
@@ -175,16 +177,22 @@ class StatsCalculator {
   async calculateTeamSOS(teamName, season, regularSeasonOnly = false, conferenceGamesOnly = false) {
     console.log(`   📊 Calculating SOS for ${teamName} (season: ${season}, regular: ${regularSeasonOnly}, conference: ${conferenceGamesOnly})`);
     
-    // Build games query with DISTINCT to prevent duplicates
+    // Build games query with DISTINCT to prevent duplicates - NOW INCLUDES win probabilities
     let gamesQuery = `
       SELECT DISTINCT ON (g.week, g.home_team, g.away_team)
         g.*,
         CASE WHEN g.home_team = $1 THEN g.away_team ELSE g.home_team END as opponent,
         CASE WHEN g.home_team = $1 THEN 'home' ELSE 'away' END as venue,
-        CASE WHEN g.home_team = $1 THEN 'home' ELSE 'away' END as home_away
+        CASE WHEN g.home_team = $1 THEN 'home' ELSE 'away' END as home_away,
+        -- Get the win probability for this team
+        CASE 
+          WHEN g.home_team = $1 THEN g.home_pregame_win_probability
+          ELSE g.away_pregame_win_probability
+        END as team_win_probability
       FROM games g
       WHERE (g.home_team = $1 OR g.away_team = $1) 
         AND g.season = $2
+        AND g.home_pregame_win_probability IS NOT NULL  -- Only include games with calculated probabilities
     `;
     
     const queryParams = [teamName, season];
@@ -208,21 +216,14 @@ class StatsCalculator {
     if (games.length === 0) {
       return {
         sos_overall: 0, sos_played: 0, sos_remaining: 0,
-        actual_wins: 0, actual_losses: 0, projected_wins: 0, win_difference: 0,
-        top40_wins: 0, top40_games: 0, coinflip_games: 0, sure_thing_games: 0, longshot_games: 0,
+        actual_wins: 0, actual_losses: 0, win_difference: 0,
+        top40_wins: 0, top40_games: 0, top40_wins_played: 0, top40_games_played: 0, top40_wins_remaining: 0, top40_games_remaining: 0,
+        coinflip_games: 0, coinflip_games_played: 0, coinflip_games_remaining: 0,
+        sure_thing_games: 0, sure_thing_games_played: 0, sure_thing_games_remaining: 0,
+        longshot_games: 0, longshot_games_played: 0, longshot_games_remaining: 0,
         games_played: 0, games_remaining: 0
       };
     }
-    
-    // Get team's own power rating
-    const teamRatingResult = await pool.query(`
-      SELECT power_rating 
-      FROM team_power_ratings 
-      WHERE LOWER(TRIM(team_name)) = LOWER(TRIM($1)) AND season = $2
-    `, [teamName, season]);
-    
-    const teamRating = teamRatingResult.rows.length > 0 ? 
-      parseFloat(teamRatingResult.rows[0].power_rating) : 0;
     
     // Separate completed and future games
     const completedGames = games.filter(g => g.completed === true);
@@ -233,13 +234,20 @@ class StatsCalculator {
     // Initialize counters
     let sosPlayed = 0, sosRemaining = 0;
     let playedOpponentCount = 0, remainingOpponentCount = 0;
-    let actualWins = 0, actualLosses = 0, projectedWins = 0;
+    let actualWins = 0, actualLosses = 0;
     let top40Wins = 0, top40Games = 0;
+    let top40WinsPlayed = 0, top40GamesPlayed = 0, top40WinsRemaining = 0, top40GamesRemaining = 0;
     let coinflipGames = 0, sureThingGames = 0, longshotGames = 0;
+    let coinflipGamesPlayed = 0, sureThingGamesPlayed = 0, longshotGamesPlayed = 0;
+    let coinflipGamesRemaining = 0, sureThingGamesRemaining = 0, longshotGamesRemaining = 0;
+    
+    // NEW: Calculate expected wins from game-level probabilities
+    let expectedWinsPlayed = 0;
+    let expectedWinsRemaining = 0;
     
     // Process completed games
     for (const game of completedGames) {
-      // Get opponent's power rating
+      // Get opponent's power rating for SOS calculation
       const opponentRating = await pool.query(`
         SELECT power_rating 
         FROM team_power_ratings 
@@ -261,6 +269,7 @@ class StatsCalculator {
         const oppRank = parseInt(opponentRank.rows[0].rank);
         if (oppRank <= 40) {
           top40Games++;
+          top40GamesPlayed++;
         }
       }
       
@@ -280,71 +289,36 @@ class StatsCalculator {
               WHERE tpr.power_rating > $1 AND tpr.season = $2
             `, [oppRating, season]);
             const oppRank = parseInt(opponentRank.rows[0].rank);
-            if (oppRank <= 40) top40Wins++;
+            if (oppRank <= 40) {
+              top40Wins++;
+              top40WinsPlayed++;
+            }
           }
         } else {
           actualLosses++;
         }
       }
       
-      // Calculate expected wins using betting lines or power ratings
-      let expectedWinsPre = 0;
+      // NEW: Use game-level win probability for expected wins
+      const winProb = parseFloat(game.team_win_probability) || 0;
+      expectedWinsPlayed += winProb;
       
-      // First try to get betting lines
-      const bettingLines = await pool.query(`
-        SELECT home_moneyline, away_moneyline, spread
-        FROM game_betting_lines 
-        WHERE game_id = $1 
-        AND UPPER(TRIM(provider)) IN ('DRAFTKINGS', 'ESPN BET')
-        LIMIT 1
-      `, [game.id]);
-      
-      if (bettingLines.rows.length > 0) {
-        const lines = bettingLines.rows[0];
-        let pregameProb = null;
-        
-        // Try moneylines first
-        if (lines.home_moneyline && lines.away_moneyline) {
-          const homeRawProb = this.moneylineToProbability(lines.home_moneyline);
-          const awayRawProb = this.moneylineToProbability(lines.away_moneyline);
-          
-          if (homeRawProb && awayRawProb) {
-            const totalProb = homeRawProb + awayRawProb;
-            const homeAdjustedProb = homeRawProb / totalProb;
-            const awayAdjustedProb = awayRawProb / totalProb;
-            pregameProb = game.home_away === 'home' ? homeAdjustedProb : awayAdjustedProb;
-          }
-        } else if (lines.spread) {
-          // Fallback to spread
-          const spreadValue = parseFloat(lines.spread);
-          const adjustedSpread = game.home_away === 'home' ? spreadValue : -spreadValue;
-          pregameProb = this.spreadToProbability(adjustedSpread);
-        }
-        
-        if (pregameProb) {
-          expectedWinsPre = pregameProb;
-        }
+      // Categorize game difficulty based on win probability
+      if (winProb >= 0.4 && winProb <= 0.6) {
+        coinflipGames++;
+        coinflipGamesPlayed++;
+      } else if (winProb >= 0.8) {
+        sureThingGames++;
+        sureThingGamesPlayed++;
+      } else if (winProb <= 0.2) {
+        longshotGames++;
+        longshotGamesPlayed++;
       }
-      
-      // If no betting data, use power ratings
-      if (expectedWinsPre === 0 && teamRating > 0 && opponentRating.rows.length > 0) {
-        const oppRating = parseFloat(opponentRating.rows[0].power_rating);
-        const homeAdvantage = game.venue === 'home' ? 2.15 : -2.15;
-        const ratingDiff = teamRating - oppRating + homeAdvantage;
-        expectedWinsPre = this.normalCDF(ratingDiff, 0, 13.5);
-      }
-      
-      projectedWins += expectedWinsPre;
-      
-      // Categorize game difficulty
-      if (expectedWinsPre >= 0.4 && expectedWinsPre <= 0.6) coinflipGames++;
-      else if (expectedWinsPre >= 0.8) sureThingGames++;
-      else if (expectedWinsPre <= 0.2) longshotGames++;
     }
     
     // Process future games
     for (const game of futureGames) {
-      // Get opponent's power rating
+      // Get opponent's power rating for SOS calculation
       const opponentRating = await pool.query(`
         SELECT power_rating 
         FROM team_power_ratings 
@@ -356,18 +330,34 @@ class StatsCalculator {
         sosRemaining += oppRating;
         remainingOpponentCount++;
         
-        // For future games, use power ratings to estimate probability
-        if (teamRating > 0) {
-          const homeAdvantage = game.venue === 'home' ? 2.15 : -2.15;
-          const ratingDiff = teamRating - oppRating + homeAdvantage;
-          const winProb = this.normalCDF(ratingDiff, 0, 13.5);
-          projectedWins += winProb;
-          
-          // Categorize future game difficulty
-          if (winProb >= 0.4 && winProb <= 0.6) coinflipGames++;
-          else if (winProb >= 0.8) sureThingGames++;
-          else if (winProb <= 0.2) longshotGames++;
+        // Check if this is a top 40 future opponent
+        const opponentRank = await pool.query(`
+          SELECT COUNT(*) + 1 as rank
+          FROM team_power_ratings tpr
+          WHERE tpr.power_rating > $1 AND tpr.season = $2
+        `, [oppRating, season]);
+        
+        const oppRank = parseInt(opponentRank.rows[0].rank);
+        if (oppRank <= 40) {
+          top40Games++;
+          top40GamesRemaining++;
         }
+      }
+      
+      // NEW: Use game-level win probability for expected wins
+      const winProb = parseFloat(game.team_win_probability) || 0;
+      expectedWinsRemaining += winProb;
+      
+      // Categorize future game difficulty
+      if (winProb >= 0.4 && winProb <= 0.6) {
+        coinflipGames++;
+        coinflipGamesRemaining++;
+      } else if (winProb >= 0.8) {
+        sureThingGames++;
+        sureThingGamesRemaining++;
+      } else if (winProb <= 0.2) {
+        longshotGames++;
+        longshotGamesRemaining++;
       }
     }
     
@@ -376,7 +366,10 @@ class StatsCalculator {
     const avgSOSRemaining = remainingOpponentCount > 0 ? sosRemaining / remainingOpponentCount : 0;
     const totalOpponents = playedOpponentCount + remainingOpponentCount;
     const avgSOSOverall = totalOpponents > 0 ? (sosPlayed + sosRemaining) / totalOpponents : 0;
-    const winDifference = actualWins - projectedWins;
+    
+    // NEW: Calculate win difference using game-level expected wins
+    const totalExpectedWins = expectedWinsPlayed + expectedWinsRemaining;
+    const winDifference = actualWins - totalExpectedWins;
     
     const result = {
       sos_overall: parseFloat(avgSOSOverall.toFixed(3)),
@@ -384,18 +377,27 @@ class StatsCalculator {
       sos_remaining: parseFloat(avgSOSRemaining.toFixed(3)),
       actual_wins: actualWins,
       actual_losses: actualLosses,
-      projected_wins: parseFloat(projectedWins.toFixed(1)),
       win_difference: parseFloat(winDifference.toFixed(1)),
       top40_wins: top40Wins,
       top40_games: top40Games,
+      top40_wins_played: top40WinsPlayed,
+      top40_games_played: top40GamesPlayed,
+      top40_wins_remaining: top40WinsRemaining,
+      top40_games_remaining: top40GamesRemaining,
       coinflip_games: coinflipGames,
+      coinflip_games_played: coinflipGamesPlayed,
+      coinflip_games_remaining: coinflipGamesRemaining,
       sure_thing_games: sureThingGames,
+      sure_thing_games_played: sureThingGamesPlayed,
+      sure_thing_games_remaining: sureThingGamesRemaining,
       longshot_games: longshotGames,
+      longshot_games_played: longshotGamesPlayed,
+      longshot_games_remaining: longshotGamesRemaining,
       games_played: completedGames.length,
       games_remaining: futureGames.length
     };
     
-    console.log(`   📈 ${teamName}: SOS=${result.sos_overall}, Record=${result.actual_wins}-${result.actual_losses}, Proj=${result.projected_wins}`);
+    console.log(`   📈 ${teamName}: SOS=${result.sos_overall}, Record=${result.actual_wins}-${result.actual_losses}, ExpWins=${totalExpectedWins.toFixed(1)}`);
     
     return result;
   }
@@ -433,7 +435,7 @@ class StatsCalculator {
 // CLI Interface
 async function main() {
   const args = process.argv.slice(2);
-  const calculator = new StatsCalculator();
+  const calculator = new SOSCalculator();
   
   if (args.includes('--sos')) {
     const season = parseInt(args.find(arg => arg.startsWith('--season='))?.split('=')[1]) || 2024;
@@ -456,4 +458,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = StatsCalculator;
+module.exports = SOSCalculator;

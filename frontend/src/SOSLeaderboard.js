@@ -138,6 +138,32 @@ const SOSLeaderboard = () => {
     return (value !== null && value !== undefined && !isNaN(parseFloat(value))) ? parseFloat(value) : 0;
   };
 
+  // Helper function for projected wins - uses the new split columns
+  const getProjectedWins = (team) => {
+    const suffix = getColumnSuffix();
+    let fieldName;
+    
+    if (activeTab === 'overall') {
+      fieldName = `projected_wins${suffix}`;
+    } else if (activeTab === 'remaining') {
+      fieldName = `projected_wins_remaining${suffix}`;
+    } else if (activeTab === 'played') {
+      fieldName = `projected_wins_played${suffix}`;
+    }
+    
+    const value = team[fieldName];
+    return (value !== null && value !== undefined && !isNaN(parseFloat(value))) ? parseFloat(value) : 0;
+  };
+
+  // Helper function for win difference - only for overall and played tabs
+  const getWinDifference = (team) => {
+    if (activeTab === 'remaining') return 0; // No wins yet for future games
+    
+    const actualWins = getTabValue(team, 'actual_wins');
+    const projectedWins = getProjectedWins(team);
+    return actualWins - projectedWins;
+  };
+
   const fetchSOSData = async () => {
     try {
       setLoading(true);
@@ -913,14 +939,14 @@ const SOSLeaderboard = () => {
                     fontSize: '14px',
                     width: '70px'
                   }}>
-                    {getTabValue(team, 'projected_wins').toFixed(1)}
+                    {getProjectedWins(team).toFixed(1)}
                   </td>
                   
                   {/* Win Difference - Only show when NOT on remaining tab */}
                   {activeTab !== 'remaining' && (() => {
-                    const diff = getTabValue(team, 'win_difference');
+                    const diff = getWinDifference(team);
                     const diffRank = getSortedAndFilteredData()
-                      .sort((a, b) => getTabValue(b, 'win_difference') - getTabValue(a, 'win_difference'))
+                      .sort((a, b) => getWinDifference(b) - getWinDifference(a))
                       .findIndex(t => t.team === team.team) + 1;
                     const diffColors = getRankColor(diffRank, totalTeams, true);
                     

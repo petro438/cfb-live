@@ -10,6 +10,7 @@ const PassingStatsPage = () => {
   const [selectedConference, setSelectedConference] = useState('all');
   const [viewType, setViewType] = useState('offense'); // offense or defense
   const [statCategory, setStatCategory] = useState('basic'); // basic or advanced
+  const [statType, setStatType] = useState('total'); // total or per_game
   const [conferenceOnly, setConferenceOnly] = useState(false);
   const [regularSeasonOnly, setRegularSeasonOnly] = useState(true);
   
@@ -96,7 +97,7 @@ const PassingStatsPage = () => {
       
       const params = new URLSearchParams({
         view_type: viewType,
-        stat_type: 'total', // Always use total for now
+        stat_type: 'total', // Always fetch totals, we'll calculate per-game in frontend
         season_type: regularSeasonOnly ? 'regular' : 'all',
         conference_only: conferenceOnly.toString(),
         ...(selectedConference !== 'all' && { conference: selectedConference })
@@ -132,6 +133,26 @@ const PassingStatsPage = () => {
     fetchData();
   }, [selectedSeason, viewType, regularSeasonOnly, conferenceOnly, selectedConference]);
 
+  // Apply per-game calculations in frontend
+  const processedTeams = React.useMemo(() => {
+    return teams.map(team => {
+      if (statType === 'per_game' && team.games_played > 0) {
+        return {
+          ...team,
+          completions: team.completions / team.games_played,
+          attempts: team.attempts / team.games_played,
+          // completion_percentage stays the same
+          passing_yards: team.passing_yards / team.games_played,
+          // yards_per_attempt stays the same
+          passing_touchdowns: team.passing_touchdowns / team.games_played,
+          interceptions: team.interceptions / team.games_played,
+          sacks_allowed: team.sacks_allowed / team.games_played
+        };
+      }
+      return team;
+    });
+  }, [teams, statType]);
+
   // Sorting function
   const handleSort = (key) => {
     let direction = 'desc';
@@ -143,7 +164,7 @@ const PassingStatsPage = () => {
 
   // Apply sorting to teams
   const sortedTeams = React.useMemo(() => {
-    let sortableTeams = [...teams];
+    let sortableTeams = [...processedTeams];
     if (sortConfig.key) {
       sortableTeams.sort((a, b) => {
         const aVal = a[sortConfig.key];
@@ -159,14 +180,24 @@ const PassingStatsPage = () => {
       });
     }
     return sortableTeams;
-  }, [teams, sortConfig]);
+  }, [processedTeams, sortConfig]);
 
-  const rankings = calculateRankings(teams);
+  const rankings = calculateRankings(processedTeams);
 
-  const formatNumber = (num, decimals = 0) => {
+  const formatNumber = (num, field) => {
     if (num === null || num === undefined) return '-';
     if (typeof num === 'string') return num;
-    return Number(num).toFixed(decimals);
+    
+    // Special formatting rules
+    if (field === 'yards_per_attempt' || field === 'completion_percentage') {
+      return Number(num).toFixed(1); // Always 1 decimal
+    }
+    
+    if (statType === 'per_game') {
+      return Number(num).toFixed(1); // 1 decimal for per-game
+    }
+    
+    return Number(num).toFixed(0); // No decimals for total stats
   };
 
   const getSortIcon = (columnKey) => {
@@ -178,16 +209,17 @@ const PassingStatsPage = () => {
       <span style={{ color: '#007bff', marginLeft: '4px' }}>↓</span>;
   };
 
-  const CellWithRank = ({ value, statKey, team, isDesktop = true, skipRanking = false }) => {
+  const CellWithRank = ({ value, statKey, team, isDesktop = true, skipRanking = false, isMobile = false }) => {
     if (skipRanking) {
       return (
         <td style={{
-          padding: '8px',
+          padding: isMobile ? '4px 2px' : '8px 16px',
           border: '1px solid #dee2e6',
           fontFamily: 'Consolas, monospace',
-          fontSize: '13px',
+          fontSize: isMobile ? '11px' : '13px',
           textAlign: 'center',
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          width: isMobile ? 'auto' : 'auto'
         }}>
           <span style={{ fontFamily: 'Consolas, monospace' }}>{value}</span>
         </td>
@@ -201,12 +233,13 @@ const PassingStatsPage = () => {
       <td style={{
         backgroundColor,
         position: 'relative',
-        padding: '8px 16px', // Wider padding for desktop
+        padding: isMobile ? '4px 2px' : '8px 16px',
         border: '1px solid #dee2e6',
         fontFamily: 'Consolas, monospace',
-        fontSize: '13px',
+        fontSize: isMobile ? '11px' : '13px',
         textAlign: 'center',
-        minWidth: '80px' // Minimum width for better spacing
+        minWidth: isMobile ? '35px' : '80px',
+        width: isMobile ? 'auto' : 'auto'
       }}>
         <span style={{ fontFamily: 'Consolas, monospace' }}>{value}</span>
         {isDesktop && ranking && (
@@ -336,46 +369,119 @@ const PassingStatsPage = () => {
         </div>
       </div>
 
-      {/* Middle Row: Page-Specific Buttons */}
+      {/* Middle Row: Page-Specific Button Groups */}
       <div style={{ 
         marginBottom: '12px',
         display: 'flex',
-        gap: '8px',
-        alignItems: 'center'
+        gap: '16px',
+        alignItems: 'center',
+        flexWrap: 'wrap'
       }}>
-        <button
-          onClick={() => setViewType(viewType === 'offense' ? 'defense' : 'offense')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: viewType === 'offense' ? '#007bff' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
-        >
-          {viewType.toUpperCase()}
-        </button>
+        {/* Offense/Defense Toggle - Style 1: Rounded buttons */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={() => setViewType('offense')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: viewType === 'offense' ? '#007bff' : '#f8f9fa',
+              color: viewType === 'offense' ? 'white' : '#212529',
+              border: '1px solid #007bff',
+              borderRadius: '16px',
+              cursor: 'pointer',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}
+          >
+            OFFENSE
+          </button>
+          <button
+            onClick={() => setViewType('defense')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: viewType === 'defense' ? '#007bff' : '#f8f9fa',
+              color: viewType === 'defense' ? 'white' : '#212529',
+              border: '1px solid #007bff',
+              borderRadius: '16px',
+              cursor: 'pointer',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}
+          >
+            DEFENSE
+          </button>
+        </div>
 
-        <button
-          onClick={() => setStatCategory(statCategory === 'basic' ? 'advanced' : 'basic')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: statCategory === 'basic' ? '#007bff' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: 'Trebuchet MS, sans-serif',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
-        >
-          {statCategory.toUpperCase()}
-        </button>
+        {/* Basic/Advanced Toggle - Style 2: Square buttons */}
+        <div style={{ display: 'flex', gap: '2px', border: '1px solid #6c757d', borderRadius: '4px' }}>
+          <button
+            onClick={() => setStatCategory('basic')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: statCategory === 'basic' ? '#6c757d' : '#ffffff',
+              color: statCategory === 'basic' ? 'white' : '#6c757d',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}
+          >
+            BASIC
+          </button>
+          <button
+            onClick={() => setStatCategory('advanced')}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: statCategory === 'advanced' ? '#6c757d' : '#ffffff',
+              color: statCategory === 'advanced' ? 'white' : '#6c757d',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}
+          >
+            ADVANCED
+          </button>
+        </div>
+
+        {/* Total/Per Game Toggle - Style 3: Underlined tabs */}
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <button
+            onClick={() => setStatType('total')}
+            style={{
+              padding: '6px 0px',
+              backgroundColor: 'transparent',
+              color: statType === 'total' ? '#28a745' : '#6c757d',
+              border: 'none',
+              borderBottom: statType === 'total' ? '2px solid #28a745' : '2px solid transparent',
+              cursor: 'pointer',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}
+          >
+            TOTAL
+          </button>
+          <button
+            onClick={() => setStatType('per_game')}
+            style={{
+              padding: '6px 0px',
+              backgroundColor: 'transparent',
+              color: statType === 'per_game' ? '#28a745' : '#6c757d',
+              border: 'none',
+              borderBottom: statType === 'per_game' ? '2px solid #28a745' : '2px solid transparent',
+              cursor: 'pointer',
+              fontFamily: 'Trebuchet MS, sans-serif',
+              fontSize: '11px',
+              fontWeight: 'bold'
+            }}
+          >
+            PER GAME
+          </button>
+        </div>
       </div>
 
       {/* Bottom Row: Checkboxes */}
@@ -425,418 +531,478 @@ const PassingStatsPage = () => {
         color: '#6c757d',
         fontFamily: 'Trebuchet MS, sans-serif'
       }}>
-        Showing {sortedTeams.length} teams
+        Showing {sortedTeams.length} teams • {statType === 'total' ? 'Season Totals' : 'Per Game Averages'}
       </div>
 
-      {/* Desktop Table */}
-      <div style={{ display: 'block' }}>
-        <style>
-          {`
-            @media (max-width: 767px) {
-              .desktop-table { display: none !important; }
-              .mobile-table { display: block !important; }
-            }
-            @media (min-width: 768px) {
-              .desktop-table { display: block !important; }
-              .mobile-table { display: none !important; }
-            }
-          `}
-        </style>
-        
-        <table className="desktop-table" style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse',
-          backgroundColor: '#ffffff',
-          border: '1px solid #dee2e6'
+      {/* Centered Table Container */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center',
+        width: '100%'
+      }}>
+        <div style={{ 
+          maxWidth: '1200px',
+          width: '100%'
         }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th 
-                onClick={() => handleSort('team')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  minWidth: '180px'
-                }}
-              >
-                TEAM{getSortIcon('team')}
-              </th>
-              <th 
-                onClick={() => handleSort('games_played')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '60px'
-                }}
-              >
-                GP{getSortIcon('games_played')}
-              </th>
-              <th 
-                onClick={() => handleSort('completions')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '80px'
-                }}
-              >
-                COMP{getSortIcon('completions')}
-              </th>
-              <th 
-                onClick={() => handleSort('attempts')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '80px'
-                }}
-              >
-                ATT{getSortIcon('attempts')}
-              </th>
-              <th 
-                onClick={() => handleSort('completion_percentage')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '80px'
-                }}
-              >
-                COMP%{getSortIcon('completion_percentage')}
-              </th>
-              <th 
-                onClick={() => handleSort('passing_yards')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '90px'
-                }}
-              >
-                YARDS{getSortIcon('passing_yards')}
-              </th>
-              <th 
-                onClick={() => handleSort('yards_per_attempt')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  lineHeight: '1.2',
-                  minWidth: '80px'
-                }}
-              >
-                YARDS/<br/>ATT{getSortIcon('yards_per_attempt')}
-              </th>
-              <th 
-                onClick={() => handleSort('passing_touchdowns')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '60px'
-                }}
-              >
-                TD{getSortIcon('passing_touchdowns')}
-              </th>
-              <th 
-                onClick={() => handleSort('interceptions')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '60px'
-                }}
-              >
-                INT{getSortIcon('interceptions')}
-              </th>
-              <th 
-                onClick={() => handleSort('sacks_allowed')}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  minWidth: '80px'
-                }}
-              >
-                SACKS{getSortIcon('sacks_allowed')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedTeams.map((team, index) => (
-              <tr key={team.team} style={{ 
-                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
-              }}>
-                <td style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dee2e6',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <img 
-                      src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                      alt={team.team}
-                      style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-                      onError={(e) => {
-                        e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-                      }}
-                    />
-                    {team.team}
-                  </div>
-                </td>
-                <CellWithRank 
-                  value={formatNumber(team.games_played)} 
-                  statKey="games_played" 
-                  team={team.team}
-                  isDesktop={true}
-                  skipRanking={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.completions, 1)} 
-                  statKey="completions" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.attempts, 1)} 
-                  statKey="attempts" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.completion_percentage, 1) + '%'} 
-                  statKey="completion_percentage" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.passing_yards, 1)} 
-                  statKey="passing_yards" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.yards_per_attempt, 2)} 
-                  statKey="yards_per_attempt" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.passing_touchdowns, 1)} 
-                  statKey="passing_touchdowns" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.interceptions, 1)} 
-                  statKey="interceptions" 
-                  team={team.team}
-                  isDesktop={true}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.sacks_allowed, 1)} 
-                  statKey="sacks_allowed" 
-                  team={team.team}
-                  isDesktop={true}
-                />
+          <style>
+            {`
+              @media (max-width: 767px) {
+                .desktop-table { display: none !important; }
+                .mobile-table { display: block !important; }
+              }
+              @media (min-width: 768px) {
+                .desktop-table { display: block !important; }
+                .mobile-table { display: none !important; }
+              }
+            `}
+          </style>
+          
+          {/* Desktop Table */}
+          <table className="desktop-table" style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            backgroundColor: '#ffffff',
+            border: '1px solid #dee2e6'
+          }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8f9fa' }}>
+                <th 
+                  onClick={() => handleSort('team')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    minWidth: '180px'
+                  }}
+                >
+                  TEAM{getSortIcon('team')}
+                </th>
+                <th 
+                  onClick={() => handleSort('games_played')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '60px'
+                  }}
+                >
+                  GP{getSortIcon('games_played')}
+                </th>
+                <th 
+                  onClick={() => handleSort('completions')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '80px'
+                  }}
+                >
+                  COMP{getSortIcon('completions')}
+                </th>
+                <th 
+                  onClick={() => handleSort('attempts')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '80px'
+                  }}
+                >
+                  ATT{getSortIcon('attempts')}
+                </th>
+                <th 
+                  onClick={() => handleSort('completion_percentage')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '80px'
+                  }}
+                >
+                  COMP%{getSortIcon('completion_percentage')}
+                </th>
+                <th 
+                  onClick={() => handleSort('passing_yards')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '90px'
+                  }}
+                >
+                  YARDS{getSortIcon('passing_yards')}
+                </th>
+                <th 
+                  onClick={() => handleSort('yards_per_attempt')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    lineHeight: '1.2',
+                    minWidth: '80px'
+                  }}
+                >
+                  YARDS/<br/>ATT{getSortIcon('yards_per_attempt')}
+                </th>
+                <th 
+                  onClick={() => handleSort('passing_touchdowns')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '60px'
+                  }}
+                >
+                  TD{getSortIcon('passing_touchdowns')}
+                </th>
+                <th 
+                  onClick={() => handleSort('interceptions')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '60px'
+                  }}
+                >
+                  INT{getSortIcon('interceptions')}
+                </th>
+                <th 
+                  onClick={() => handleSort('sacks_allowed')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    minWidth: '80px'
+                  }}
+                >
+                  SACKS{getSortIcon('sacks_allowed')}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedTeams.map((team, index) => (
+                <tr key={team.team} style={{ 
+                  backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                }}>
+                  <td style={{
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <img 
+                        src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                        alt={team.team}
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                        }}
+                      />
+                      {team.team}
+                    </div>
+                  </td>
+                  <CellWithRank 
+                    value={formatNumber(team.games_played, 'games_played')} 
+                    statKey="games_played" 
+                    team={team.team}
+                    isDesktop={true}
+                    skipRanking={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.completions, 'completions')} 
+                    statKey="completions" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.attempts, 'attempts')} 
+                    statKey="attempts" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.completion_percentage, 'completion_percentage') + '%'} 
+                    statKey="completion_percentage" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.passing_yards, 'passing_yards')} 
+                    statKey="passing_yards" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.yards_per_attempt, 'yards_per_attempt')} 
+                    statKey="yards_per_attempt" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.passing_touchdowns, 'passing_touchdowns')} 
+                    statKey="passing_touchdowns" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.interceptions, 'interceptions')} 
+                    statKey="interceptions" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.sacks_allowed, 'sacks_allowed')} 
+                    statKey="sacks_allowed" 
+                    team={team.team}
+                    isDesktop={true}
+                  />
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {/* Mobile Table - More columns */}
-        <table className="mobile-table" style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse',
-          backgroundColor: '#ffffff',
-          border: '1px solid #dee2e6'
-        }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f8f9fa' }}>
-              <th style={{
-                padding: '6px',
-                border: '1px solid #dee2e6',
-                fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                textAlign: 'left'
-              }}>
-                TEAM
-              </th>
-              <th style={{
-                padding: '6px',
-                border: '1px solid #dee2e6',
-                fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                textAlign: 'center'
-              }}>
-                COMP
-              </th>
-              <th style={{
-                padding: '6px',
-                border: '1px solid #dee2e6',
-                fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                textAlign: 'center'
-              }}>
-                ATT
-              </th>
-              <th style={{
-                padding: '6px',
-                border: '1px solid #dee2e6',
-                fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                textAlign: 'center'
-              }}>
-                YDS
-              </th>
-              <th style={{
-                padding: '6px',
-                border: '1px solid #dee2e6',
-                fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                textAlign: 'center'
-              }}>
-                TD
-              </th>
-              <th style={{
-                padding: '6px',
-                border: '1px solid #dee2e6',
-                fontFamily: 'Trebuchet MS, sans-serif',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                textAlign: 'center'
-              }}>
-                INT
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedTeams.map((team, index) => (
-              <tr key={`mobile-${team.team}`} style={{ 
-                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
-              }}>
-                <td style={{
-                  padding: '6px',
+          {/* Mobile Table - Compact with all columns */}
+          <table className="mobile-table" style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            backgroundColor: '#ffffff',
+            border: '1px solid #dee2e6'
+          }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8f9fa' }}>
+                <th style={{
+                  padding: '4px 2px',
                   border: '1px solid #dee2e6',
                   fontFamily: 'Trebuchet MS, sans-serif',
-                  fontSize: '10px',
+                  fontSize: '9px',
                   fontWeight: 'bold',
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  textAlign: 'left',
+                  width: '25%'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <img 
-                      src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-                      alt={team.team}
-                      style={{ width: '14px', height: '14px', objectFit: 'contain' }}
-                      onError={(e) => {
-                        e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
-                      }}
-                    />
-                    <span style={{ fontSize: '9px' }}>
-                      {team.team?.length > 6 ? team.team.substring(0, 6) + '...' : team.team}
-                    </span>
-                  </div>
-                </td>
-                <CellWithRank 
-                  value={formatNumber(team.completions, 0)} 
-                  statKey="completions" 
-                  team={team.team}
-                  isDesktop={false}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.attempts, 0)} 
-                  statKey="attempts" 
-                  team={team.team}
-                  isDesktop={false}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.passing_yards, 0)} 
-                  statKey="passing_yards" 
-                  team={team.team}
-                  isDesktop={false}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.passing_touchdowns, 0)} 
-                  statKey="passing_touchdowns" 
-                  team={team.team}
-                  isDesktop={false}
-                />
-                <CellWithRank 
-                  value={formatNumber(team.interceptions, 0)} 
-                  statKey="interceptions" 
-                  team={team.team}
-                  isDesktop={false}
-                />
+                  TEAM
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '8%'
+                }}>
+                  GP
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '10%'
+                }}>
+                  CMP
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '10%'
+                }}>
+                  ATT
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '10%'
+                }}>
+                  YDS
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '8%'
+                }}>
+                  TD
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '8%'
+                }}>
+                  INT
+                </th>
+                <th style={{
+                  padding: '4px 2px',
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                  width: '8%'
+                }}>
+                  SCK
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedTeams.map((team, index) => (
+                <tr key={`mobile-${team.team}`} style={{ 
+                  backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                }}>
+                  <td style={{
+                    padding: '4px 2px',
+                    border: '1px solid #dee2e6',
+                    fontFamily: 'Trebuchet MS, sans-serif',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <img 
+                        src={team.logo_url?.replace('http://', 'https://') || 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                        alt={team.team}
+                        style={{ width: '12px', height: '12px', objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.target.src = 'https://a.espncdn.com/i/teamlogos/ncaa/500/default.png';
+                        }}
+                      />
+                      <span style={{ fontSize: '8px' }}>
+                        {team.team}
+                      </span>
+                    </div>
+                  </td>
+                  <CellWithRank 
+                    value={formatNumber(team.games_played, 'games_played')} 
+                    statKey="games_played" 
+                    team={team.team}
+                    isDesktop={false}
+                    skipRanking={true}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.completions, 'completions')} 
+                    statKey="completions" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.attempts, 'attempts')} 
+                    statKey="attempts" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.passing_yards, 'passing_yards')} 
+                    statKey="passing_yards" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.passing_touchdowns, 'passing_touchdowns')} 
+                    statKey="passing_touchdowns" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.interceptions, 'interceptions')} 
+                    statKey="interceptions" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                  <CellWithRank 
+                    value={formatNumber(team.sacks_allowed, 'sacks_allowed')} 
+                    statKey="sacks_allowed" 
+                    team={team.team}
+                    isDesktop={false}
+                    isMobile={true}
+                  />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

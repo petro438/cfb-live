@@ -823,6 +823,8 @@ app.get('/api/leaderboards/passing/:season', async (req, res) => {
 
 // Add this endpoint to your server.js file
 
+// Add this endpoint to your server.js file
+
 // Rushing Stats Leaderboard Endpoint
 app.get('/api/leaderboards/rushing/:season', async (req, res) => {
   try {
@@ -1075,6 +1077,7 @@ app.get('/api/leaderboards/rushing/:season', async (req, res) => {
     
     console.log(`✅ Returning ${processedTeams.length} teams for ${offense_defense} rushing stats`);
     
+    // Return consistent format - just the array of teams
     res.json(processedTeams);
     
   } catch (err) {

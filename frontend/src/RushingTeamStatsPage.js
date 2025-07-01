@@ -38,17 +38,26 @@ const RushingStatsPage = () => {
           params.append('conference', selectedConference);
         }
         
+        console.log('🔍 Fetching from:', `${endpoint}?${params}`);
+        
         const response = await fetch(`${endpoint}?${params}`);
         if (!response.ok) throw new Error('Failed to fetch rushing stats');
         
         const data = await response.json();
-        setTeams(data);
+        console.log('📊 API Response:', data);
+        
+        // Handle both array and object with teams property
+        const teamsData = Array.isArray(data) ? data : (data.teams || []);
+        console.log('📋 Teams data:', teamsData.length, 'teams');
+        
+        setTeams(teamsData);
         
         // Extract unique conferences
-        const conferences = [...new Set(data.map(team => team.conference))].filter(Boolean).sort();
+        const conferences = [...new Set(teamsData.map(team => team.conference))].filter(Boolean).sort();
         setAvailableConferences(['all', ...conferences]);
         
       } catch (err) {
+        console.error('❌ Fetch error:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -60,32 +69,63 @@ const RushingStatsPage = () => {
 
   // Process and sort teams
   const processedTeams = useMemo(() => {
-    let processed = teams.map(team => {
+    console.log('🔄 Processing teams:', teams.length);
+    
+    if (!teams || teams.length === 0) {
+      console.log('⚠️ No teams to process');
+      return [];
+    }
+    
+    let processed = teams.map((team, index) => {
+      if (index < 3) {
+        console.log('📊 Sample team data:', team);
+      }
+      
       // Calculate per-game stats if needed
       const gamesPlayed = team.games_played || 1;
       
+      // Ensure we have valid numbers
+      const rushingAttempts = parseInt(team.rushing_attempts) || 0;
+      const rushingYards = parseInt(team.rushing_yards) || 0;
+      const rushingTds = parseInt(team.rushing_tds) || 0;
+      const totalPlays = parseInt(team.total_plays) || 0;
+      const yardsPerRush = parseFloat(team.yards_per_rush) || 0;
+      
       return {
         ...team,
-        // Calculate rushing rate: rush_attempts / (rush_attempts + pass_attempts)
-        rushing_rate: team.total_plays > 0 ? 
-          ((team.rushing_attempts / team.total_plays) * 100) : 0,
+        // Ensure we have team_name
+        team_name: team.team_name || team.team,
+        
+        // Calculate rushing rate: rush_attempts / total_plays
+        rushing_rate: totalPlays > 0 ? 
+          ((rushingAttempts / totalPlays) * 100) : 0,
         
         // Per-game calculations
         rushing_attempts_per_game: totalPerGame === 'per_game' ? 
-          (team.rushing_attempts / gamesPlayed) : team.rushing_attempts,
+          (rushingAttempts / gamesPlayed) : rushingAttempts,
         rushing_yards_per_game: totalPerGame === 'per_game' ? 
-          (team.rushing_yards / gamesPlayed) : team.rushing_yards,
-        yards_per_rush_display: team.yards_per_rush || 0,
+          (rushingYards / gamesPlayed) : rushingYards,
+        yards_per_rush_display: yardsPerRush,
         rushing_tds_per_game: totalPerGame === 'per_game' ? 
-          (team.rushing_tds / gamesPlayed) : team.rushing_tds,
-        rushing_rate_display: team.total_plays > 0 ? 
-          ((team.rushing_attempts / team.total_plays) * 100) : 0
+          (rushingTds / gamesPlayed) : rushingTds,
+        rushing_rate_display: totalPlays > 0 ? 
+          ((rushingAttempts / totalPlays) * 100) : 0,
+          
+        // Ensure numeric values
+        rushing_attempts: rushingAttempts,
+        rushing_yards: rushingYards,
+        rushing_tds: rushingTds,
+        yards_per_rush: yardsPerRush,
+        games_played: gamesPlayed
       };
     });
+    
+    console.log('✅ Processed teams:', processed.length);
 
     // Apply conference filter
     if (selectedConference !== 'all') {
       processed = processed.filter(team => team.conference === selectedConference);
+      console.log('🔍 After conference filter:', processed.length);
     }
 
     // Sort teams
@@ -107,6 +147,13 @@ const RushingStatsPage = () => {
 
   // Calculate percentile rankings
   const teamsWithRankings = useMemo(() => {
+    console.log('📈 Starting percentile calculations for', processedTeams.length, 'teams');
+    
+    if (!processedTeams || processedTeams.length === 0) {
+      console.log('⚠️ No processed teams for ranking');
+      return [];
+    }
+    
     const rankedTeams = [...processedTeams];
     
     // Calculate percentiles for each stat
@@ -117,20 +164,36 @@ const RushingStatsPage = () => {
       stats[4] = 'rushing_tds_per_game';
     }
     
-    stats.forEach(stat => {
+    console.log('📊 Calculating percentiles for stats:', stats);
+    
+    stats.forEach((stat, statIndex) => {
+      console.log(`🔢 Processing stat ${statIndex + 1}/${stats.length}: ${stat}`);
+      
       const sortedValues = rankedTeams
-        .map(team => parseFloat(team[stat]) || 0)
+        .map(team => {
+          const value = parseFloat(team[stat]);
+          return isNaN(value) ? 0 : value;
+        })
         .sort((a, b) => b - a); // Higher is better for rushing stats
         
-      rankedTeams.forEach(team => {
-        const value = parseFloat(team[stat]) || 0;
-        const rank = sortedValues.indexOf(value) + 1;
+      console.log(`📋 ${stat} values range: ${sortedValues[sortedValues.length-1]} to ${sortedValues[0]}`);
+        
+      rankedTeams.forEach((team, teamIndex) => {
+        const value = parseFloat(team[stat]);
+        const cleanValue = isNaN(value) ? 0 : value;
+        const rank = sortedValues.indexOf(cleanValue) + 1;
         const percentile = ((rankedTeams.length - rank + 1) / rankedTeams.length) * 100;
+        
         team[`${stat}_rank`] = rank;
         team[`${stat}_percentile`] = percentile;
+        
+        if (teamIndex < 2) {
+          console.log(`📊 ${team.team_name}: ${stat}=${cleanValue}, rank=${rank}, percentile=${percentile.toFixed(1)}`);
+        }
       });
     });
     
+    console.log('✅ Percentile calculations complete');
     return rankedTeams;
   }, [processedTeams, totalPerGame]);
 
@@ -200,6 +263,18 @@ const RushingStatsPage = () => {
 
   if (loading) return <div style={{ textAlign: 'center', padding: '40px' }}>Loading rushing stats...</div>;
   if (error) return <div style={{ textAlign: 'center', padding: '40px', color: '#721c24' }}>Error: {error}</div>;
+
+  // Debug info
+  if (teams.length === 0) {
+    return <div style={{ textAlign: 'center', padding: '40px' }}>
+      No rushing stats data available. Check console for details.
+    </div>;
+  }
+
+  // Show raw data for first few teams for debugging
+  console.log('🔍 First 3 teams raw data:', teams.slice(0, 3));
+  console.log('🔍 Processed teams count:', processedTeams.length);
+  console.log('🔍 Teams with rankings count:', teamsWithRankings.length);
 
   return (
     <div style={{ 

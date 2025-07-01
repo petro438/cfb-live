@@ -313,7 +313,7 @@ function HomePage() {
       textAlign: 'center',
       fontFamily: 'Consolas, monospace',
       fontWeight: 'bold',
-      width: '120px'
+      width: isMobile ? '75px' : '120px'
     }}>
       <div style={{
         display: 'flex',
@@ -650,7 +650,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: '120px'
+                width: isMobile ? '75px' : '120px'
               }} onClick={() => handleSort('powerRating')}>
                 RATING
                 {sortField === 'powerRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -663,7 +663,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: '120px'
+                width: isMobile ? '75px' : '120px'
               }} onClick={() => handleSort('offenseRating')}>
                 OFF
                 {sortField === 'offenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -676,7 +676,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: '120px'
+                width: isMobile ? '75px' : '120px'
               }} onClick={() => handleSort('defenseRating')}>
                 DEF
                 {sortField === 'defenseRating' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -689,7 +689,7 @@ function HomePage() {
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                width: '120px'
+                width: isMobile ? '75px' : '120px'
               }} onClick={() => handleSort('strengthOfSchedule')}>
                 SoS
                 {sortField === 'strengthOfSchedule' && (sortDirection === 'asc' ? '↑' : '↓')}

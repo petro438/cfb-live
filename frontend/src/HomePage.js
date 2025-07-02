@@ -26,8 +26,6 @@ const getPercentileColor = (rank, total) => {
   return '#ea4335';
 };
 
-const [sosData, setSosData] = useState([]);
-
 function HomePage() {
   const [sortField, setSortField] = useState('powerRating');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -36,6 +34,7 @@ function HomePage() {
   const [rankingScope, setRankingScope] = useState('national'); // 'national' or 'conference'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sosData, setSosData] = useState([]);
   
   // Season and classification filters
   const [selectedSeason, setSelectedSeason] = useState(2025);

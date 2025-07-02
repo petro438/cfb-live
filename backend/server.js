@@ -1534,245 +1534,68 @@ app.get('/api/teams/:teamName/games', async (req, res) => {
   }
 });
 
-// Luck Leaderboard Endpoint
-app.get('/api/leaderboards/luck/:season', async (req, res) => {
+// Add this endpoint to your server.js if it's missing or broken
+
+// FAST Luck Endpoint - reads from pre-calculated table
+app.get('/api/leaderboards/luck-fast/:season', async (req, res) => {
   try {
     const { season } = req.params;
-    const { 
-      includePostseason = 'false', 
-      conferenceOnly = 'false',
-      conference = null 
-    } = req.query;
+    const { conference } = req.query;
     
-    console.log(`🍀 Calculating luck data for ${season}`);
+    console.log(`🍀 Fast Luck fetch for ${season}`);
+    const start = Date.now();
     
-    // Get all teams with their power ratings for the season
-    const teamsQuery = `
-      SELECT DISTINCT
-        t.school as team,
-        t.conference,
-        t.classification,
+    let query = `
+      SELECT 
+        la.*,
         t.logo_url,
         t.abbreviation,
-        COALESCE(tpr.power_rating, 0) as team_rating,
-        (SELECT COUNT(*) + 1 FROM team_power_ratings tpr2 
-         WHERE tpr2.power_rating > tpr.power_rating AND tpr2.season = $1) as power_rank
-      FROM teams t
-      LEFT JOIN team_power_ratings tpr ON LOWER(TRIM(t.school)) = LOWER(TRIM(tpr.team_name))
-        AND tpr.season = $1
-      WHERE t.classification = 'fbs'
-      ${conference ? 'AND t.conference = $2' : ''}
-      ORDER BY t.school
+        CONCAT(la.wins, '-', la.losses) as record,
+        CASE 
+          WHEN la.close_game_total > 0 
+          THEN CONCAT(la.close_game_wins, '-', (la.close_game_total - la.close_game_wins))
+          ELSE '0-0'
+        END as close_game_record
+      FROM luck_analysis la
+      LEFT JOIN teams t ON LOWER(TRIM(t.school)) = LOWER(TRIM(la.team_name))
+      WHERE la.season = $1
     `;
     
-    const queryParams = [season];
-    if (conference) queryParams.push(conference);
+    const params = [season];
     
-    const teamsResult = await pool.query(teamsQuery, queryParams);
-    const teams = teamsResult.rows;
-    
-    console.log(`📊 Found ${teams.length} teams for luck calculation`);
-    
-    if (teams.length === 0) {
-      return res.status(404).json({ 
-        error: `No teams found for ${season}` 
-      });
+    if (conference && conference !== 'all') {
+      query += ` AND la.conference = $2`;
+      params.push(conference);
     }
     
-    // Calculate luck metrics for each team
-    const luckData = [];
+    query += ` ORDER BY la.deserved_vs_actual ASC`;
     
-    for (const team of teams) {
-      console.log(`🎲 Calculating luck for ${team.team}`);
-      
-      // Get all games for this team
-      let gamesQuery = `
-        SELECT 
-          g.*,
-          CASE 
-            WHEN g.home_team = $1 THEN g.away_team
-            ELSE g.home_team
-          END as opponent,
-          CASE 
-            WHEN g.home_team = $1 THEN 'home'
-            ELSE 'away'
-          END as venue
-        FROM games g
-        WHERE (g.home_team = $1 OR g.away_team = $1) 
-          AND g.season = $2
-          AND g.completed = true
-      `;
-      
-      const gameQueryParams = [team.team, season];
-      
-      // Add filters based on query parameters
-      if (conferenceOnly === 'true') {
-        gamesQuery += ` AND g.conference_game = true`;
-      }
-      
-      if (includePostseason === 'false') {
-        gamesQuery += ` AND g.season_type = 'regular'`;
-      }
-      
-      gamesQuery += ` ORDER BY g.week`;
-      
-      const gamesResult = await pool.query(gamesQuery, gameQueryParams);
-      const games = gamesResult.rows;
-      
-      // Initialize counters
-      let actualWins = 0;
-      let actualLosses = 0;
-      let expectedWins = 0;
-      let deservedWins = 0;
-      let closeGameWins = 0;
-      let closeGameTotal = 0;
-      let totalFumbles = 0;
-      let teamFumbleRecoveries = 0;
-      let totalInterceptions = 0;
-      let teamInterceptions = 0;
-      let turnovers = 0;
-      let takeaways = 0;
-      
-      // Process each game
-      for (const game of games) {
-        const teamScore = game.venue === 'home' ? game.home_points : game.away_points;
-        const oppScore = game.venue === 'home' ? game.away_points : game.home_points;
-        const scoreDiff = Math.abs(teamScore - oppScore);
-        
-        // Actual wins/losses
-        if (teamScore > oppScore) {
-          actualWins++;
-          if (scoreDiff <= 8) closeGameWins++;
-        } else {
-          actualLosses++;
-        }
-        
-        // Close games
-        if (scoreDiff <= 8) {
-          closeGameTotal++;
-        }
-        
-        // Expected wins (from betting lines)
-        if (game.home_moneyline && game.away_moneyline) {
-          const homeProb = moneylineToProbability(game.home_moneyline);
-          const awayProb = moneylineToProbability(game.away_moneyline);
-          
-          if (homeProb && awayProb) {
-            const totalProb = homeProb + awayProb;
-            const homeAdjusted = homeProb / totalProb;
-            const awayAdjusted = awayProb / totalProb;
-            
-            const teamProb = game.venue === 'home' ? homeAdjusted : awayAdjusted;
-            expectedWins += teamProb;
-          }
-        } else if (game.spread) {
-          const spreadValue = parseFloat(game.spread);
-          const adjustedSpread = game.venue === 'home' ? spreadValue : -spreadValue;
-          const winProb = normalCDF(-adjustedSpread, 0, 13.5);
-          expectedWins += winProb;
-        }
-        
-        // Deserved wins (from postgame win probability)
-        const postgameProb = game.venue === 'home' 
-          ? parseFloat(game.home_postgame_win_probability)
-          : parseFloat(game.away_postgame_win_probability);
-        
-        if (postgameProb) {
-          deservedWins += postgameProb;
-        }
-        
-        // Get game stats for turnover luck (if available)
-        const gameStatsQuery = `
-          SELECT 
-            team,
-            fumbles_lost,
-            fumbles_recovered,
-            interceptions
-          FROM game_stats
-          WHERE game_id = $1 AND (team = $2 OR team = $3)
-        `;
-        
-        try {
-          const gameStatsResult = await pool.query(gameStatsQuery, [
-            game.id, 
-            team.team, 
-            game.opponent
-          ]);
-          
-          const teamStats = gameStatsResult.rows.find(s => s.team === team.team);
-          const oppStats = gameStatsResult.rows.find(s => s.team === game.opponent);
-          
-          if (teamStats && oppStats) {
-            // Fumble luck
-            const gameFumbles = (teamStats.fumbles_lost || 0) + (oppStats.fumbles_lost || 0);
-            const teamRecoveries = (oppStats.fumbles_lost || 0); // Team recovers opponent fumbles
-            totalFumbles += gameFumbles;
-            teamFumbleRecoveries += teamRecoveries;
-            
-            // Interception luck
-            const gameInterceptions = (teamStats.interceptions || 0) + (oppStats.interceptions || 0);
-            totalInterceptions += gameInterceptions;
-            teamInterceptions += (teamStats.interceptions || 0);
-            
-            // Turnover margin
-            turnovers += (teamStats.fumbles_lost || 0);
-            takeaways += (teamStats.interceptions || 0) + (oppStats.fumbles_lost || 0);
-          }
-        } catch (err) {
-          // Game stats might not be available - continue without them
-          console.log(`📊 No game stats for ${team.team} vs ${game.opponent}`);
-        }
-      }
-      
-      // Calculate final metrics
-      const record = `${actualWins}-${actualLosses}`;
-      const expectedVsActual = actualWins - expectedWins;
-      const deservedVsActual = deservedWins - actualWins;
-      const expectedVsDeserved = deservedWins - expectedWins;
-      const closeGameRecord = closeGameTotal > 0 ? `${closeGameWins}-${closeGameTotal - closeGameWins}` : '0-0';
-      const fumbleRecoveryRate = totalFumbles > 0 ? (teamFumbleRecoveries / totalFumbles) * 100 : 50;
-      const interceptionRate = totalInterceptions > 0 ? (teamInterceptions / totalInterceptions) * 100 : 50;
-      const turnoverMargin = takeaways - turnovers;
-      
-      luckData.push({
-        team: team.team,
-        conference: team.conference,
-        logo_url: team.logo_url,
-        abbreviation: team.abbreviation,
-        power_rank: team.power_rank,
-        record: record,
-        expected_wins: expectedWins,
-        deserved_wins: deservedWins,
-        expected_vs_actual: expectedVsActual,
-        deserved_vs_actual: deservedVsActual,
-        expected_vs_deserved: expectedVsDeserved,
-        close_game_record: closeGameRecord,
-        fumble_recovery_rate: fumbleRecoveryRate,
-        interception_rate: interceptionRate,
-        turnover_margin: turnoverMargin,
-        games_played: games.length
-      });
-    }
+    const result = await pool.query(query, params);
     
-    // Sort by expected vs actual difference (most lucky first)
-    luckData.sort((a, b) => b.expected_vs_actual - a.expected_vs_actual);
-    
-    console.log(`✅ Calculated luck data for ${luckData.length} teams`);
+    console.log(`✅ Fast Luck: ${result.rows.length} teams in ${Date.now() - start}ms`);
     
     res.json({
-      teams: luckData,
+      teams: result.rows,
       metadata: {
-        season: season,
-        total_teams: luckData.length,
-        include_postseason: includePostseason === 'true',
-        conference_only: conferenceOnly === 'true',
-        conference_filter: conference,
-        generated_at: new Date().toISOString()
+        season: parseInt(season),
+        total_teams: result.rows.length,
+        last_calculated: result.rows[0]?.last_updated,
+        calculation_time: `${Date.now() - start}ms (pre-calculated)`
       }
     });
     
   } catch (err) {
-    console.error('❌ Error calculating luck data:', err);
+    console.error('❌ Fast Luck error:', err);
+    
+    // If table doesn't exist, return helpful error
+    if (err.code === '42P01') {
+      return res.status(404).json({ 
+        error: 'Luck analysis table not found',
+        message: 'Run the luck calculation script first: node calculate-luck-data.js --luck --season=' + req.params.season,
+        details: 'The luck_analysis table needs to be created and populated.'
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Internal server error', 
       details: err.message 
@@ -1883,7 +1706,6 @@ app.get('/', (req, res) => {
       'GET /api/teams/:teamName/games?season=2024',
       'GET /api/teams/:teamName/games-enhanced/:season',
       'GET /api/all-advanced-stats/:season',
-      'GET /api/leaderboards/luck/:season (SLOW - 20+ seconds)',
       'GET /api/leaderboards/luck-fast/:season (FAST - <100ms)',
       'GET /api/leaderboards/strength-of-schedule-fast/:season (FAST)',
       'GET /api/calculation-status/:type/:season',

@@ -155,13 +155,13 @@ const SOSLeaderboard = () => {
     return (value !== null && value !== undefined && !isNaN(parseFloat(value))) ? parseFloat(value) : 0;
   };
 
-  // Helper function for win difference - only for overall and played tabs
+  // Helper function for win difference - calculated from completed games only
   const getWinDifference = (team) => {
-    if (activeTab === 'remaining') return 0; // No wins yet for future games
+    // Win difference should always be based on played games only
+    const actualWinsPlayed = getTabValue(team, 'actual_wins'); // These are always from completed games
+    const projectedWinsPlayed = team[`projected_wins_played${getColumnSuffix()}`] || 0;
     
-    const actualWins = getTabValue(team, 'actual_wins');
-    const projectedWins = getProjectedWins(team);
-    return actualWins - projectedWins;
+    return parseFloat(actualWinsPlayed) - parseFloat(projectedWinsPlayed);
   };
 
   const fetchSOSData = async () => {
@@ -750,28 +750,26 @@ const SOSLeaderboard = () => {
                 <span className="sort-arrow-desktop">{getSortArrow('projected_wins')}</span>
               </th>
               
-              {/* ACT VS EXP column - only show when NOT on remaining tab */}
-              {activeTab !== 'remaining' && (
-                <th 
-                  style={{ 
-                    padding: '8px 4px', 
-                    textAlign: 'center', 
-                    border: '1px solid #dee2e6',
-                    fontFamily: 'Trebuchet MS, sans-serif',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                    minWidth: '80px'
-                  }}
-                  onClick={() => handleSort('win_difference')}
-                >
-                  <span className="act-vs-exp-desktop">ACT VS EXP</span>
-                  <span className="act-vs-exp-mobile" style={{ display: 'none' }}>ACT VS<br/>EXP</span>
-                  <span className="sort-arrow-desktop">{getSortArrow('win_difference')}</span>
-                </th>
-              )}
+              {/* ACT VS EXP column - show on all tabs now */}
+              <th 
+                style={{ 
+                  padding: '8px 4px', 
+                  textAlign: 'center', 
+                  border: '1px solid #dee2e6',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  minWidth: '80px'
+                }}
+                onClick={() => handleSort('win_difference')}
+              >
+                <span className="act-vs-exp-desktop">ACT VS EXP</span>
+                <span className="act-vs-exp-mobile" style={{ display: 'none' }}>ACT VS<br/>EXP</span>
+                <span className="sort-arrow-desktop">{getSortArrow('win_difference')}</span>
+              </th>
               
               <th 
                 style={{ 
@@ -942,8 +940,8 @@ const SOSLeaderboard = () => {
                     {getProjectedWins(team).toFixed(1)}
                   </td>
                   
-                  {/* Win Difference - Only show when NOT on remaining tab */}
-                  {activeTab !== 'remaining' && (() => {
+                  {/* Win Difference - Show on all tabs, but always based on completed games */}
+                  {(() => {
                     const diff = getWinDifference(team);
                     const diffRank = getSortedAndFilteredData()
                       .sort((a, b) => getWinDifference(b) - getWinDifference(a))
@@ -1001,11 +999,11 @@ const SOSLeaderboard = () => {
                         // Show just the number of games for remaining tab
                         return getTabValue(team, 'top40_games');
                       } else {
-                        // Show record for overall/played tabs
+                        // Show record format with total games for overall/played tabs: "0-0 (9)"
                         const wins = getTabValue(team, 'top40_wins');
-                        const games = getTabValue(team, 'top40_games');
-                        const losses = games - wins;
-                        return `${wins}-${losses}`;
+                        const totalGames = getTabValue(team, 'top40_games');
+                        const losses = totalGames - wins;
+                        return `${wins}-${losses} (${totalGames})`;
                       }
                     })()}
                   </td>

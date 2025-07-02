@@ -87,9 +87,9 @@ const LuckLeaderboard = () => {
       if (aVal === null || aVal === undefined) aVal = sortDirection === 'asc' ? Infinity : -Infinity;
       if (bVal === null || bVal === undefined) bVal = sortDirection === 'asc' ? Infinity : -Infinity;
       
-      // Convert to numbers if possible
-      if (typeof aVal === 'string' && !isNaN(aVal)) aVal = parseFloat(aVal);
-      if (typeof bVal === 'string' && !isNaN(bVal)) bVal = parseFloat(bVal);
+      // Convert string numbers to actual numbers
+      if (typeof aVal === 'string' && !isNaN(parseFloat(aVal))) aVal = parseFloat(aVal);
+      if (typeof bVal === 'string' && !isNaN(parseFloat(bVal))) bVal = parseFloat(bVal);
       
       if (sortDirection === 'asc') {
         return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
@@ -501,7 +501,7 @@ const LuckLeaderboard = () => {
                   
                   {/* Record */}
                   <td style={{...cellStyle, fontWeight: 'bold'}}>
-                    {team.wins}-{team.losses}
+                    {team.record || `${team.wins}-${team.losses}`}
                   </td>
                   
                   {/* Expected Wins */}
@@ -540,7 +540,7 @@ const LuckLeaderboard = () => {
                     fontWeight: 'bold',
                     borderRight: '3px solid #dc3545'
                   }}>
-                    {team.close_game_record}
+                    {team.close_game_record || `${team.close_game_wins}-${team.close_game_total - team.close_game_wins}`}
                   </td>
                   
                   {/* Fumble Recovery % */}

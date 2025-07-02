@@ -11,6 +11,7 @@ const LuckLeaderboard = () => {
   const [sortColumn, setSortColumn] = useState('deserved_vs_actual');
   const [sortDirection, setSortDirection] = useState('asc');
   const [conferences, setConferences] = useState([]);
+  const [fbsTeamCount, setFbsTeamCount] = useState(134); // Track actual FBS team count
 
   // Fixed fetchLuckData function for fast endpoint
   const fetchLuckData = React.useCallback(async () => {
@@ -52,7 +53,27 @@ const LuckLeaderboard = () => {
       const uniqueConferences = [...new Set(teamsData.map(team => team.conference))].filter(Boolean).sort();
       setConferences(uniqueConferences);
       
-      setTeams(teamsData);
+      // Calculate FBS-only rankings and count
+      const fbsTeams = teamsData.filter(team => team.power_rank); // Only teams with power rankings
+      const fbsCount = fbsTeams.length;
+      setFbsTeamCount(fbsCount);
+      
+      // Sort FBS teams by power rating to create FBS-only rankings
+      const fbsTeamsSorted = fbsTeams.sort((a, b) => (a.power_rank || 999) - (b.power_rank || 999));
+      
+      // Add FBS-only ranking to each team
+      const teamsWithFbsRanks = teamsData.map(team => {
+        if (team.power_rank) {
+          const fbsRankIndex = fbsTeamsSorted.findIndex(t => t.team_name === team.team_name);
+          return {
+            ...team,
+            fbs_rank: fbsRankIndex >= 0 ? fbsRankIndex + 1 : null
+          };
+        }
+        return { ...team, fbs_rank: null };
+      });
+      
+      setTeams(teamsWithFbsRanks);
       setError(null);
       
     } catch (err) {
@@ -100,10 +121,10 @@ const LuckLeaderboard = () => {
   }, [teams, sortColumn, sortDirection]);
 
   // Get rank color for FBS-only team rank badges  
-  const getRankColor = (rank, totalFBSTeams = 134) => {
-    if (!rank || rank < 1) return { bg: '#6c757d', text: '#fff' };
+  const getRankColor = (fbsRank, totalFBSTeams) => {
+    if (!fbsRank || fbsRank < 1 || !totalFBSTeams) return { bg: '#6c757d', text: '#fff' };
     
-    const percentile = ((totalFBSTeams - rank + 1) / totalFBSTeams) * 100;
+    const percentile = ((totalFBSTeams - fbsRank + 1) / totalFBSTeams) * 100;
     
     if (percentile >= 96) return { bg: '#58c36c', text: '#fff' };
     if (percentile >= 91) return { bg: '#6aca7c', text: '#fff' };
@@ -331,7 +352,7 @@ const LuckLeaderboard = () => {
         </div>
         
         <div style={{ fontSize: '14px', color: '#6c757d' }}>
-          {teams.length} teams • Last calculated: {teams[0]?.last_updated ? new Date(teams[0].last_updated).toLocaleDateString() : 'Unknown'}
+          {teams.length} teams • {fbsTeamCount} FBS teams ranked • Last calculated: {teams[0]?.last_updated ? new Date(teams[0].last_updated).toLocaleDateString() : 'Unknown'}
         </div>
       </div>
 
@@ -391,9 +412,8 @@ const LuckLeaderboard = () => {
           
           <tbody>
             {sortedTeams.map((team, index) => {
-              // Calculate FBS-only ranking for proper percentile coloring
-              const fbsRank = team.power_rank && team.power_rank <= 134 ? team.power_rank : null;
-              const colors = getRankColor(fbsRank, 134);
+              // Use FBS-only ranking for proper percentile coloring
+              const colors = getRankColor(team.fbs_rank, fbsTeamCount);
               
               return (
                 <tr key={team.team_name} style={{ 
@@ -433,7 +453,7 @@ const LuckLeaderboard = () => {
                             {team.team_name}
                           </span>
                         </a>
-                        {team.power_rank && team.power_rank <= 134 && (
+                        {team.fbs_rank && (
                           <span style={{
                             backgroundColor: colors.bg,
                             color: colors.text,
@@ -444,7 +464,7 @@ const LuckLeaderboard = () => {
                             minWidth: '24px',
                             textAlign: 'center'
                           }}>
-                            #{team.power_rank}
+                            #{team.fbs_rank}
                           </span>
                         )}
                       </div>
@@ -480,7 +500,7 @@ const LuckLeaderboard = () => {
                             {team.abbreviation || team.team_name?.substring(0, 4).toUpperCase()}
                           </span>
                         </a>
-                        {team.power_rank && team.power_rank <= 134 && (
+                        {team.fbs_rank && (
                           <span style={{
                             backgroundColor: colors.bg,
                             color: colors.text,
@@ -491,7 +511,7 @@ const LuckLeaderboard = () => {
                             minWidth: '20px',
                             textAlign: 'center'
                           }}>
-                            #{team.power_rank}
+                            #{team.fbs_rank}
                           </span>
                         )}
                       </div>

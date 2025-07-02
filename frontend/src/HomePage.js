@@ -315,25 +315,27 @@ function HomePage() {
       fontWeight: 'bold',
       width: isMobile ? '70px' : '90px'
     }}>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{ fontSize: '12px', lineHeight: '1' }}>
-          {value.toFixed(1)}
-        </div>
-        <div style={{
-          fontSize: '10px',
-          fontWeight: 'normal',
-          opacity: 0.8,
-          marginTop: '2px',
-          lineHeight: '1'
-        }}>
-          #{rank}
-        </div>
-      </div>
+      {/* Rank - prominent and larger */}
+            <div style={{
+              fontSize: isMobile ? '14px' : '16px',
+              fontWeight: 'bold',
+              fontFamily: '"Trebuchet MS", Arial, sans-serif',
+              color: '#000',
+              lineHeight: '1',
+              marginBottom: '2px'
+            }}>
+              #{rank}
+            </div>
+
+            {/* Value - smaller below */}
+            <div style={{ 
+              fontSize: isMobile ? '10px' : '12px', 
+              lineHeight: '1',
+              fontFamily: 'Consolas, monospace',
+              color: '#333'
+            }}>
+              {value.toFixed(1)}
+            </div>
     </td>
   );
 

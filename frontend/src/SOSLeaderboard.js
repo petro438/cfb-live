@@ -90,8 +90,8 @@ const SOSLeaderboard = () => {
   const [error, setError] = useState(null);
   
   // Default to "remaining" for 2025 season, "overall" for others
-  const [selectedSeason, setSelectedSeason] = useState('2024');
-  const [activeTab, setActiveTab] = useState(selectedSeason === '2025' ? 'remaining' : 'overall');
+  const [selectedSeason, setSelectedSeason] = useState('2025'); // Changed default to 2025
+  const [activeTab, setActiveTab] = useState('overall'); // Always default to overall now
   
   const [sortConfig, setSortConfig] = useState({ key: 'sos_rank', direction: 'asc' });
   const [selectedConference, setSelectedConference] = useState('all');
@@ -103,9 +103,9 @@ const SOSLeaderboard = () => {
   const [availableSeasons] = useState(['2024', '2025']);
   const [showExplanation, setShowExplanation] = useState(false);
 
-  // Update activeTab when season changes
+  // Update activeTab when season changes - always default to overall
   useEffect(() => {
-    setActiveTab(selectedSeason === '2025' ? 'remaining' : 'overall');
+    setActiveTab('overall');
   }, [selectedSeason]);
 
   // Helper function to get the correct column suffix based on filters
@@ -676,44 +676,6 @@ const SOSLeaderboard = () => {
                   textAlign: 'center', 
                   border: '1px solid #dee2e6',
                   borderLeft: '3px solid #007bff',
-                  borderRight: '3px solid #007bff',
-                  fontFamily: 'Trebuchet MS, sans-serif',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  minWidth: '60px',
-                  width: '80px'
-                }}
-                onClick={() => handleSort(
-                  activeTab === 'overall' ? 'sos_overall' : 
-                  activeTab === 'remaining' ? 'sos_remaining' : 
-                  'sos_played'
-                )}
-              >
-                <span className="sos-header-desktop">
-                  {activeTab === 'overall' ? 'SOS OVERALL' : 
-                  activeTab === 'remaining' ? 'SOS REMAINING' : 
-                  'SOS PLAYED'}
-                </span>
-                <span className="sos-header-mobile" style={{ display: 'none' }}>
-                  SOS
-                </span>
-                
-                <span className="sort-arrow-desktop">{getSortArrow(
-                  activeTab === 'overall' ? 'sos_overall' : 
-                  activeTab === 'remaining' ? 'sos_remaining' : 
-                  'sos_played'
-                )}</span>
-              </th>
-        
-              <th 
-                style={{ 
-                  padding: '8px 4px', 
-                  textAlign: 'center', 
-                  border: '1px solid #dee2e6',
-                  borderLeft: '3px solid #007bff',
                   backgroundColor: '#e3f2fd',
                   fontFamily: 'Trebuchet MS, sans-serif',
                   fontWeight: 'bold',
@@ -748,6 +710,44 @@ const SOSLeaderboard = () => {
                 <span className="exp-wins-desktop">EXP. WINS</span>
                 <span className="exp-wins-mobile" style={{ display: 'none' }}>EXP<br/>WINS</span>
                 <span className="sort-arrow-desktop">{getSortArrow('projected_wins')}</span>
+              </th>
+              
+              <th 
+                style={{ 
+                  padding: '8px 4px', 
+                  textAlign: 'center', 
+                  border: '1px solid #dee2e6',
+                  borderLeft: '3px solid #007bff',
+                  borderRight: '3px solid #007bff',
+                  fontFamily: 'Trebuchet MS, sans-serif',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  minWidth: '60px',
+                  width: '80px'
+                }}
+                onClick={() => handleSort(
+                  activeTab === 'overall' ? 'sos_overall' : 
+                  activeTab === 'remaining' ? 'sos_remaining' : 
+                  'sos_played'
+                )}
+              >
+                <span className="sos-header-desktop">
+                  {activeTab === 'overall' ? 'SOS OVERALL' : 
+                  activeTab === 'remaining' ? 'SOS REMAINING' : 
+                  'SOS PLAYED'}
+                </span>
+                <span className="sos-header-mobile" style={{ display: 'none' }}>
+                  SOS
+                </span>
+                
+                <span className="sort-arrow-desktop">{getSortArrow(
+                  activeTab === 'overall' ? 'sos_overall' : 
+                  activeTab === 'remaining' ? 'sos_remaining' : 
+                  'sos_played'
+                )}</span>
               </th>
               
               {/* ACT VS EXP column - show on all tabs now */}
@@ -896,19 +896,6 @@ const SOSLeaderboard = () => {
                     </div>
                   </td>
                   
-                  {/* SOS Column */}
-                  <StatCell 
-                    value={getTabValue(team, 'sos_overall')}
-                    rank={selectedConference === 'all' ? rank : 
-                          (rankingScope === 'national' ? rank : 
-                          getSortedAndFilteredData()
-                            .sort((a, b) => parseFloat(b.sos_overall) - parseFloat(a.sos_overall))
-                            .findIndex(t => t.team === team.team) + 1)}
-                    isHigherBetter={false}
-                    totalForPercentiles={totalTeams}
-                    showRank={true}
-                  />
-                  
                   {/* Record/Games Column */}
                   <td style={{ 
                     padding: '8px 4px', 
@@ -926,19 +913,61 @@ const SOSLeaderboard = () => {
                       `${getTabValue(team, 'actual_wins')}-${getTabValue(team, 'actual_losses')}`}
                   </td>
                   
-                  {/* Expected Wins */}
-                  <td style={{
-                    padding: '8px 4px',
-                    border: '1px solid #dee2e6',
-                    backgroundColor: '#e3f2fd',
-                    fontFamily: 'Consolas, monospace',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    width: '70px'
-                  }}>
-                    {getProjectedWins(team).toFixed(1)}
-                  </td>
+                  {/* Expected Wins - Now with color formatting and ranks */}
+                  {(() => {
+                    const expectedWins = getProjectedWins(team);
+                    const expWinsRank = getSortedAndFilteredData()
+                      .sort((a, b) => getProjectedWins(b) - getProjectedWins(a))
+                      .findIndex(t => t.team === team.team) + 1;
+                    const expWinsColors = getRankColor(expWinsRank, totalTeams, true); // Higher expected wins = better = green
+                    
+                    return (
+                      <td style={{
+                        padding: '8px 4px',
+                        border: '1px solid #dee2e6',
+                        backgroundColor: expWinsColors.bg,
+                        color: expWinsColors.text,
+                        fontFamily: 'Consolas, monospace',
+                        textAlign: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        width: '70px'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <div style={{ fontSize: '12px', lineHeight: '1' }}>
+                            {expectedWins.toFixed(1)}
+                          </div>
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: 'normal',
+                            opacity: 0.8,
+                            marginTop: '2px',
+                            lineHeight: '1'
+                          }}>
+                            #{expWinsRank}
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })()}
+                  
+                  {/* SOS Column */}
+                  <StatCell 
+                    value={getTabValue(team, 'sos_overall')}
+                    rank={selectedConference === 'all' ? rank : 
+                          (rankingScope === 'national' ? rank : 
+                          getSortedAndFilteredData()
+                            .sort((a, b) => parseFloat(b.sos_overall) - parseFloat(a.sos_overall))
+                            .findIndex(t => t.team === team.team) + 1)}
+                    isHigherBetter={false}
+                    totalForPercentiles={totalTeams}
+                    showRank={true}
+                  />
                   
                   {/* Win Difference - Show on all tabs, but always based on completed games */}
                   {(() => {

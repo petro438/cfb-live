@@ -99,11 +99,11 @@ const LuckLeaderboard = () => {
     });
   }, [teams, sortColumn, sortDirection]);
 
-  // Get rank color for team rank badges  
-  const getRankColor = (rank) => {
+  // Get rank color for FBS-only team rank badges  
+  const getRankColor = (rank, totalFBSTeams = 134) => {
     if (!rank || rank < 1) return { bg: '#6c757d', text: '#fff' };
     
-    const percentile = ((134 - rank + 1) / 134) * 100;
+    const percentile = ((totalFBSTeams - rank + 1) / totalFBSTeams) * 100;
     
     if (percentile >= 96) return { bg: '#58c36c', text: '#fff' };
     if (percentile >= 91) return { bg: '#6aca7c', text: '#fff' };
@@ -374,7 +374,6 @@ const LuckLeaderboard = () => {
             <tr>
               <th style={groupHeaderStyle} rowSpan="2">Team</th>
               <th style={groupHeaderStyle} rowSpan="2">Record</th>
-              <th style={{...groupHeaderStyle, borderRight: '3px solid #17a2b8'}} colSpan="2">Expected vs Actual</th>
               <th style={{...groupHeaderStyle, borderRight: '3px solid #28a745'}} colSpan="2">Deserved vs Actual</th>
               <th style={{...groupHeaderStyle, borderRight: '3px solid #dc3545'}} rowSpan="2">Close Games<br/>(≤8 pts)</th>
               <th style={{...groupHeaderStyle}} colSpan="3">Turnover Luck</th>
@@ -382,8 +381,6 @@ const LuckLeaderboard = () => {
             
             {/* Individual column headers */}
             <tr>
-              <SortableHeader column="expected_wins" style={{fontSize: '10px'}}>Expected<br/>Wins</SortableHeader>
-              <SortableHeader column="expected_vs_actual" style={{fontSize: '10px', borderRight: '3px solid #17a2b8'}}>Difference</SortableHeader>
               <SortableHeader column="deserved_wins" style={{fontSize: '10px'}}>Deserved<br/>Wins</SortableHeader>
               <SortableHeader column="deserved_vs_actual" style={{fontSize: '10px', borderRight: '3px solid #28a745'}}>Difference</SortableHeader>
               <SortableHeader column="fumble_recovery_rate" style={{fontSize: '10px'}}>Fumble<br/>Recovery %</SortableHeader>
@@ -394,7 +391,9 @@ const LuckLeaderboard = () => {
           
           <tbody>
             {sortedTeams.map((team, index) => {
-              const colors = getRankColor(team.power_rank);
+              // Calculate FBS-only ranking for proper percentile coloring
+              const fbsRank = team.power_rank && team.power_rank <= 134 ? team.power_rank : null;
+              const colors = getRankColor(fbsRank, 134);
               
               return (
                 <tr key={team.team_name} style={{ 
@@ -434,7 +433,7 @@ const LuckLeaderboard = () => {
                             {team.team_name}
                           </span>
                         </a>
-                        {team.power_rank && (
+                        {team.power_rank && team.power_rank <= 134 && (
                           <span style={{
                             backgroundColor: colors.bg,
                             color: colors.text,
@@ -481,7 +480,7 @@ const LuckLeaderboard = () => {
                             {team.abbreviation || team.team_name?.substring(0, 4).toUpperCase()}
                           </span>
                         </a>
-                        {team.power_rank && (
+                        {team.power_rank && team.power_rank <= 134 && (
                           <span style={{
                             backgroundColor: colors.bg,
                             color: colors.text,
@@ -502,21 +501,6 @@ const LuckLeaderboard = () => {
                   {/* Record */}
                   <td style={{...cellStyle, fontWeight: 'bold'}}>
                     {team.record || `${team.wins}-${team.losses}`}
-                  </td>
-                  
-                  {/* Expected Wins */}
-                  <td style={{...cellStyle, backgroundColor: '#e3f2fd'}}>
-                    {formatStat(team.expected_wins, 1)}
-                  </td>
-                  
-                  {/* Expected vs Actual Difference */}
-                  <td style={{
-                    ...cellStyle,
-                    backgroundColor: getLuckColor(team.expected_vs_actual, 'deserved_difference'),
-                    borderRight: '3px solid #17a2b8',
-                    fontWeight: 'bold'
-                  }}>
-                    {team.expected_vs_actual > 0 ? '+' : ''}{formatStat(team.expected_vs_actual, 1)}
                   </td>
                   
                   {/* Deserved Wins */}
@@ -579,13 +563,13 @@ const LuckLeaderboard = () => {
       }}>
         <h4 style={{ margin: '0 0 10px 0' }}>How to Read This:</h4>
         <ul style={{ margin: '0', paddingLeft: '20px' }}>
-          <li><strong>Expected Wins:</strong> Pregame expectations based on betting lines or power ratings</li>
           <li><strong>Deserved Wins:</strong> Sum of postgame win probabilities based on actual performance</li>
-          <li><strong>Difference:</strong> Actual wins minus expected/deserved - positive = lucky, negative = unlucky</li>
+          <li><strong>Difference:</strong> Deserved wins minus actual wins - positive = unlucky/deserved better, negative = lucky/overperformed</li>
           <li><strong>Close Games:</strong> Record in games decided by 8 points or less</li>
           <li><strong>Fumble Recovery %:</strong> Percentage of all fumbles in team's games that were recovered by the team</li>
           <li><strong>Interception Rate %:</strong> Percentage of total interceptions + deflections in team's games made by the team</li>
           <li><strong>Turnover Margin:</strong> Total takeaways minus total turnovers</li>
+          <li><strong>Rankings:</strong> FBS-only power rankings (1-134)</li>
         </ul>
       </div>
     </div>

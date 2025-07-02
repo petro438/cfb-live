@@ -12,92 +12,57 @@ const LuckLeaderboard = () => {
   const [sortDirection, setSortDirection] = useState('asc');
   const [conferences, setConferences] = useState([]);
 
-  // 🔧 FIX 1: Update the fetchLuckData function to handle filtering properly
-// Replace lines ~25-60 in your fetchLuckData function:
-
-const fetchLuckData = React.useCallback(async () => {
-  try {
-    setLoading(true);
-    
-    const API_URL = process.env.REACT_APP_API_URL || 'https://cfbapi-production.up.railway.app';
-    
-    // ✅ Build parameters to match your server.js API expectations
-    const params = new URLSearchParams();
-    
-    // Add conference filter if not 'all'
-    if (conferenceFilter !== 'all') {
-      params.append('conference', conferenceFilter);
-    }
-    
-    // Add game type filters - matching your server.js parameter names
-    if (conferenceOnlyGames) {
-      params.append('conferenceOnly', 'true');
-    }
-    
-    // Note: Your API uses 'includePostseason' - true means include playoffs
-    if (!regularSeasonOnly) {
-      params.append('includePostseason', 'true');
-    } else {
-      params.append('includePostseason', 'false');
-    }
-    
-    // 🐛 DEBUG: Log what we're sending
-    const queryString = params.toString();
-    console.log('🔍 Filter Debug Info:');
-    console.log('- Conference Filter:', conferenceFilter);
-    console.log('- Conference Only Games:', conferenceOnlyGames);
-    console.log('- Regular Season Only:', regularSeasonOnly);
-    console.log('- Query String:', queryString);
-    
-    // Try the fast endpoint first, fallback to regular endpoint
-    let response;
-    let finalUrl;
-    
+  // Fixed fetchLuckData function for fast endpoint
+  const fetchLuckData = React.useCallback(async () => {
     try {
-      finalUrl = `${API_URL}/api/leaderboards/luck-fast/${selectedSeason}${queryString ? '?' + queryString : ''}`;
-      console.log('🚀 Trying fast endpoint:', finalUrl);
-      response = await fetch(finalUrl);
+      setLoading(true);
+      
+      const API_URL = process.env.REACT_APP_API_URL || 'https://cfbapi-production.up.railway.app';
+      
+      // Build parameters for fast endpoint
+      const params = new URLSearchParams();
+      
+      // Add conference filter if not 'all'
+      if (conferenceFilter !== 'all') {
+        params.append('conference', conferenceFilter);
+      }
+      
+      // Build URL for fast endpoint
+      const queryString = params.toString();
+      const finalUrl = `${API_URL}/api/leaderboards/luck-fast/${selectedSeason}${queryString ? '?' + queryString : ''}`;
+      
+      console.log('🚀 Fetching luck data from:', finalUrl);
+      
+      const response = await fetch(finalUrl);
       
       if (!response.ok) {
-        throw new Error(`Fast endpoint returned ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorText}`);
       }
-      console.log('✅ Fast endpoint succeeded');
-    } catch (error) {
-      console.log('⚠️ Fast endpoint failed:', error.message);
-      finalUrl = `${API_URL}/api/leaderboards/luck/${selectedSeason}${queryString ? '?' + queryString : ''}`;
-      console.log('🔄 Trying regular endpoint:', finalUrl);
-      response = await fetch(finalUrl);
+      
+      const data = await response.json();
+      const teamsData = data.teams || [];
+      
+      console.log('📊 API Response:');
+      console.log('- Teams received:', teamsData.length);
+      console.log('- Metadata:', data.metadata);
+      console.log('- Sample team:', teamsData[0]);
+      
+      // Extract unique conferences from the actual data
+      const uniqueConferences = [...new Set(teamsData.map(team => team.conference))].filter(Boolean).sort();
+      setConferences(uniqueConferences);
+      
+      setTeams(teamsData);
+      setError(null);
+      
+    } catch (err) {
+      console.error('❌ Error fetching luck data:', err);
+      setError(`Failed to load data: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Error ${response.status}: ${errorText}`);
-    }
-    
-    const data = await response.json();
-    const teamsData = data.teams || [];
-    
-    console.log('📊 API Response:');
-    console.log('- Teams received:', teamsData.length);
-    console.log('- Metadata:', data.metadata);
-    console.log('- Sample team:', teamsData[0]);
-    
-    // Extract unique conferences from the actual data
-    const uniqueConferences = [...new Set(teamsData.map(team => team.conference))].filter(Boolean).sort();
-    setConferences(uniqueConferences);
-    
-    setTeams(teamsData);
-    setError(null);
-    
-  } catch (err) {
-    console.error('❌ Filter Error Details:', err);
-    setError(`Failed to load data: ${err.message}`);
-  } finally {
-    setLoading(false);
-  }
-}, [selectedSeason, conferenceFilter, conferenceOnlyGames, regularSeasonOnly]);
+  }, [selectedSeason, conferenceFilter]);
 
-  // ✅ FIXED: Only depend on the memoized function
   useEffect(() => {
     fetchLuckData();
   }, [fetchLuckData]);
@@ -259,7 +224,12 @@ const fetchLuckData = React.useCallback(async () => {
         color: '#d32f2f',
         fontFamily: '"Trebuchet MS", Arial, sans-serif'
       }}>
-        Error: {error}
+        <h3>Error Loading Luck Data</h3>
+        <p>{error}</p>
+        <p style={{ fontSize: '14px', color: '#666' }}>
+          Make sure you've run the luck calculation script first:<br/>
+          <code>node calculate-luck-data.js --luck --season={selectedSeason}</code>
+        </p>
       </div>
     );
   }
@@ -286,11 +256,10 @@ const fetchLuckData = React.useCallback(async () => {
       {/* Explainer Section */}
       <div style={{
         maxWidth: '1400px',
-        margin: '0 auto',
+        margin: '20px auto',
         padding: '20px',
         backgroundColor: '#f8f9fa',
-        borderRadius: '8px',
-        marginBottom: '20px'
+        borderRadius: '8px'
       }}>
         <h3 style={{ margin: '0 0 15px 0', color: '#343a40' }}>How These Stats Work</h3>
         <div style={{ 
@@ -301,13 +270,16 @@ const fetchLuckData = React.useCallback(async () => {
           lineHeight: '1.4'
         }}>
           <div>
-            <strong style={{ color: '#28a745' }}>Deserved Wins:</strong> Based on postgame win probability, which attempts to remove luck and determine which team would win if the game were played an infinite number of times.
+            <strong style={{ color: '#28a745' }}>Expected Wins:</strong> Based on pregame win probabilities from betting lines or power ratings.
           </div>
           <div>
-            <strong style={{ color: '#dc3545' }}>Close Games:</strong> Games decided by 8 points or less, where luck and random events have the biggest impact on final outcomes.
+            <strong style={{ color: '#17a2b8' }}>Deserved Wins:</strong> Based on postgame win probability, measuring actual game performance.
           </div>
           <div>
-            <strong style={{ color: '#ffc107' }}>Turnover Luck:</strong> Fumble recovery rates and interception-to-deflection ratios that measure how lucky or unlucky a team has been with turnovers throughout the season.
+            <strong style={{ color: '#dc3545' }}>Close Games:</strong> Games decided by 8 points or less, where luck has the biggest impact.
+          </div>
+          <div>
+            <strong style={{ color: '#ffc107' }}>Turnover Luck:</strong> Fumble recovery rates and interception percentages that measure fortunate bounces.
           </div>
         </div>
       </div>
@@ -357,37 +329,9 @@ const fetchLuckData = React.useCallback(async () => {
             ))}
           </select>
         </div>
-
-        <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={conferenceOnlyGames}
-                    onChange={(e) => {
-                      console.log('📋 Conference Only changed to:', e.target.checked);
-                      setConferenceOnlyGames(e.target.checked);
-                    }}
-                  />
-                  <span style={{ fontWeight: 'bold' }}>Conference Games Only</span>
-                </label>
-              </div>
-
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={regularSeasonOnly}
-                    onChange={(e) => {
-                      console.log('📋 Regular Season Only changed to:', e.target.checked);
-                      setRegularSeasonOnly(e.target.checked);
-                    }}
-                  />
-                  <span style={{ fontWeight: 'bold' }}>Regular Season Only</span>
-                </label>
-              </div>
         
         <div style={{ fontSize: '14px', color: '#6c757d' }}>
-          {teams.length} teams • Updated {new Date().toLocaleDateString()}
+          {teams.length} teams • Last calculated: {teams[0]?.last_updated ? new Date(teams[0].last_updated).toLocaleDateString() : 'Unknown'}
         </div>
       </div>
 
@@ -426,136 +370,153 @@ const fetchLuckData = React.useCallback(async () => {
           fontSize: '13px'
         }}>
           <thead>
-                {/* Group headers */}
-                <tr>
-                  <th style={groupHeaderStyle} rowSpan="2">Team</th>
-                  <th style={groupHeaderStyle} rowSpan="2">Record</th>
-                  <th style={{...groupHeaderStyle, borderRight: '3px solid #28a745'}} colSpan="2">Deserved vs Actual</th>
-                  <th style={{...groupHeaderStyle, borderRight: '3px solid #dc3545'}} rowSpan="2">Close Games<br/>(≤8 pts)</th>
-                  <th style={{...groupHeaderStyle}} colSpan="3">Turnover Luck</th>
-                </tr>
-                
-                {/* Individual column headers */}
-                <tr>
-                  <SortableHeader column="deserved_wins" style={{fontSize: '10px'}}>Deserved<br/>Wins</SortableHeader>
-                  <SortableHeader column="deserved_vs_actual" style={{fontSize: '10px', borderRight: '3px solid #28a745'}}>Difference</SortableHeader>
-                  <SortableHeader column="fumble_recovery_rate" style={{fontSize: '10px'}}>Fumble<br/>Recovery %</SortableHeader>
-                  <SortableHeader column="interception_rate" style={{fontSize: '10px'}}>Interception<br/>Rate %</SortableHeader>
-                  <SortableHeader column="turnover_margin" style={{fontSize: '10px'}}>Turnover<br/>Margin</SortableHeader>
-                </tr>
-              </thead>
+            {/* Group headers */}
+            <tr>
+              <th style={groupHeaderStyle} rowSpan="2">Team</th>
+              <th style={groupHeaderStyle} rowSpan="2">Record</th>
+              <th style={{...groupHeaderStyle, borderRight: '3px solid #17a2b8'}} colSpan="2">Expected vs Actual</th>
+              <th style={{...groupHeaderStyle, borderRight: '3px solid #28a745'}} colSpan="2">Deserved vs Actual</th>
+              <th style={{...groupHeaderStyle, borderRight: '3px solid #dc3545'}} rowSpan="2">Close Games<br/>(≤8 pts)</th>
+              <th style={{...groupHeaderStyle}} colSpan="3">Turnover Luck</th>
+            </tr>
+            
+            {/* Individual column headers */}
+            <tr>
+              <SortableHeader column="expected_wins" style={{fontSize: '10px'}}>Expected<br/>Wins</SortableHeader>
+              <SortableHeader column="expected_vs_actual" style={{fontSize: '10px', borderRight: '3px solid #17a2b8'}}>Difference</SortableHeader>
+              <SortableHeader column="deserved_wins" style={{fontSize: '10px'}}>Deserved<br/>Wins</SortableHeader>
+              <SortableHeader column="deserved_vs_actual" style={{fontSize: '10px', borderRight: '3px solid #28a745'}}>Difference</SortableHeader>
+              <SortableHeader column="fumble_recovery_rate" style={{fontSize: '10px'}}>Fumble<br/>Recovery %</SortableHeader>
+              <SortableHeader column="interception_rate" style={{fontSize: '10px'}}>Interception<br/>Rate %</SortableHeader>
+              <SortableHeader column="turnover_margin" style={{fontSize: '10px'}}>Turnover<br/>Margin</SortableHeader>
+            </tr>
+          </thead>
           
           <tbody>
             {sortedTeams.map((team, index) => {
               const colors = getRankColor(team.power_rank);
               
               return (
-                <tr key={team.team} style={{ 
+                <tr key={team.team_name} style={{ 
                   backgroundColor: index % 2 === 1 ? '#f8f9fa' : '#ffffff'
                 }}>
+                  {/* Team */}
+                  <td style={{...cellStyle, textAlign: 'left'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Desktop: Logo -> Team Name -> Ranking */}
+                      <div className="team-layout-desktop" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <a 
+                          href={`/team/${encodeURIComponent(team.team_name)}?season=${selectedSeason}`}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            cursor: 'pointer'
+                          }}
+                          onMouseOver={(e) => e.target.closest('a').style.textDecoration = 'underline'}
+                          onMouseOut={(e) => e.target.closest('a').style.textDecoration = 'none'}
+                        >
+                          <img 
+                            src={team.logo_url || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                            alt={`${team.team_name} logo`}
+                            style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+                          />
+                          <span 
+                            style={{ 
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase',
+                              fontFamily: '"Trebuchet MS", Arial, sans-serif',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {team.team_name}
+                          </span>
+                        </a>
+                        {team.power_rank && (
+                          <span style={{
+                            backgroundColor: colors.bg,
+                            color: colors.text,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            minWidth: '24px',
+                            textAlign: 'center'
+                          }}>
+                            #{team.power_rank}
+                          </span>
+                        )}
+                      </div>
 
-{/* Team */}
-<td style={{...cellStyle, textAlign: 'left'}}>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-    {/* Desktop: Logo -> Team Name -> Ranking */}
-    <div className="team-layout-desktop" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <a 
-        href={`/team/${encodeURIComponent(team.team_name || team.team)}?season=${selectedSeason}`}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px',
-          textDecoration: 'none',
-          color: 'inherit',
-          cursor: 'pointer'
-        }}
-        onMouseOver={(e) => e.target.closest('a').style.textDecoration = 'underline'}
-        onMouseOut={(e) => e.target.closest('a').style.textDecoration = 'none'}
-      >
-        <img 
-          src={team.logo_url || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-          alt={`${team.team_name || team.team} logo`}
-          style={{ width: '24px', height: '24px', objectFit: 'contain' }}
-        />
-        <span 
-          style={{ 
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            fontFamily: '"Trebuchet MS", Arial, sans-serif',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {team.team_name || team.team}
-        </span>
-      </a>
-      {team.power_rank && (
-        <span style={{
-          backgroundColor: colors.bg,
-          color: colors.text,
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          minWidth: '24px',
-          textAlign: 'center'
-        }}>
-          #{team.power_rank}
-        </span>
-      )}
-    </div>
-
-    {/* Mobile: Logo -> Abbreviation -> Ranking */}
-    <div className="team-layout-mobile" style={{ display: 'none', alignItems: 'center', gap: '4px' }}>
-      <a 
-        href={`/team/${encodeURIComponent(team.team_name || team.team)}?season=${selectedSeason}`}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '4px',
-          textDecoration: 'none',
-          color: 'inherit',
-          cursor: 'pointer'
-        }}
-        onMouseOver={(e) => e.target.closest('a').style.textDecoration = 'underline'}
-        onMouseOut={(e) => e.target.closest('a').style.textDecoration = 'none'}
-      >
-        <img 
-          src={team.logo_url || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
-          alt={`${team.team_name || team.team} logo`}
-          style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-        />
-        <span 
-          style={{ 
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            fontFamily: '"Trebuchet MS", Arial, sans-serif',
-            fontSize: '11px'
-          }}
-        >
-          {team.abbreviation || (team.team_name || team.team)?.substring(0, 4).toUpperCase()}
-        </span>
-      </a>
-      {team.power_rank && (
-        <span style={{
-          backgroundColor: colors.bg,
-          color: colors.text,
-          padding: '2px 4px',
-          borderRadius: '3px',
-          fontSize: '10px',
-          fontWeight: 'bold',
-          minWidth: '20px',
-          textAlign: 'center'
-        }}>
-          #{team.power_rank}
-        </span>
-      )}
-    </div>
-  </div>
-</td>
+                      {/* Mobile: Logo -> Abbreviation -> Ranking */}
+                      <div className="team-layout-mobile" style={{ display: 'none', alignItems: 'center', gap: '4px' }}>
+                        <a 
+                          href={`/team/${encodeURIComponent(team.team_name)}?season=${selectedSeason}`}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            cursor: 'pointer'
+                          }}
+                          onMouseOver={(e) => e.target.closest('a').style.textDecoration = 'underline'}
+                          onMouseOut={(e) => e.target.closest('a').style.textDecoration = 'none'}
+                        >
+                          <img 
+                            src={team.logo_url || 'http://a.espncdn.com/i/teamlogos/ncaa/500/default.png'} 
+                            alt={`${team.team_name} logo`}
+                            style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                          />
+                          <span 
+                            style={{ 
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase',
+                              fontFamily: '"Trebuchet MS", Arial, sans-serif',
+                              fontSize: '11px'
+                            }}
+                          >
+                            {team.abbreviation || team.team_name?.substring(0, 4).toUpperCase()}
+                          </span>
+                        </a>
+                        {team.power_rank && (
+                          <span style={{
+                            backgroundColor: colors.bg,
+                            color: colors.text,
+                            padding: '2px 4px',
+                            borderRadius: '3px',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            minWidth: '20px',
+                            textAlign: 'center'
+                          }}>
+                            #{team.power_rank}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
                   
                   {/* Record */}
                   <td style={{...cellStyle, fontWeight: 'bold'}}>
-                    {team.record}
+                    {team.wins}-{team.losses}
+                  </td>
+                  
+                  {/* Expected Wins */}
+                  <td style={{...cellStyle, backgroundColor: '#e3f2fd'}}>
+                    {formatStat(team.expected_wins, 1)}
+                  </td>
+                  
+                  {/* Expected vs Actual Difference */}
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: getLuckColor(team.expected_vs_actual, 'deserved_difference'),
+                    borderRight: '3px solid #17a2b8',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.expected_vs_actual > 0 ? '+' : ''}{formatStat(team.expected_vs_actual, 1)}
                   </td>
                   
                   {/* Deserved Wins */}
@@ -592,14 +553,14 @@ const fetchLuckData = React.useCallback(async () => {
                     {formatStat(team.interception_rate, 1)}%
                   </td>
                   
-                        {/* Turnover Margin */}
-                    <td style={{
-                      ...cellStyle,
-                      backgroundColor: getLuckColor(team.turnover_margin, 'turnover_margin'),
-                      fontWeight: 'bold'
-                    }}>
-                      {team.turnover_margin > 0 ? '+' : ''}{team.turnover_margin}
-                    </td>
+                  {/* Turnover Margin */}
+                  <td style={{
+                    ...cellStyle,
+                    backgroundColor: getLuckColor(team.turnover_margin, 'turnover_margin'),
+                    fontWeight: 'bold'
+                  }}>
+                    {team.turnover_margin > 0 ? '+' : ''}{team.turnover_margin}
+                  </td>
                 </tr>
               );
             })}
@@ -618,11 +579,12 @@ const fetchLuckData = React.useCallback(async () => {
       }}>
         <h4 style={{ margin: '0 0 10px 0' }}>How to Read This:</h4>
         <ul style={{ margin: '0', paddingLeft: '20px' }}>
-          <li><strong>Deserved Wins:</strong> Sum of postgame win probabilities based on performance</li> 
-          <li><strong>Difference:</strong> Deserved wins minus actual wins - positive = unlucky/deserved better, negative = lucky/overperformed</li>
+          <li><strong>Expected Wins:</strong> Pregame expectations based on betting lines or power ratings</li>
+          <li><strong>Deserved Wins:</strong> Sum of postgame win probabilities based on actual performance</li>
+          <li><strong>Difference:</strong> Actual wins minus expected/deserved - positive = lucky, negative = unlucky</li>
           <li><strong>Close Games:</strong> Record in games decided by 8 points or less</li>
-          <li><strong>Fumble Recovery %:</strong> Percentage of all fumbles (team + opponent) that were recovered by the team</li>
-          <li><strong>Interception Rate %:</strong> Percentage of total interceptions in team's games that were made by the team</li>
+          <li><strong>Fumble Recovery %:</strong> Percentage of all fumbles in team's games that were recovered by the team</li>
+          <li><strong>Interception Rate %:</strong> Percentage of total interceptions + deflections in team's games made by the team</li>
           <li><strong>Turnover Margin:</strong> Total takeaways minus total turnovers</li>
         </ul>
       </div>

@@ -56,7 +56,7 @@ const StatCell = ({ value, rank, isHigherBetter = true, totalForPercentiles, sho
       textAlign: 'center',
       fontFamily: 'Consolas, monospace',
       fontWeight: 'bold',
-      width: '80px'
+      width: '60px'
     }}>
       <div style={{
         display: 'flex',
@@ -905,8 +905,8 @@ const SOSLeaderboard = () => {
                     fontFamily: 'Consolas, monospace',
                     textAlign: 'center',
                     fontWeight: 'bold',
-                    fontSize: '14px',
-                    width: '70px'
+                    fontSize: '12px',
+                    width: '43px'
                   }}>
                     {activeTab === 'remaining' ? 
                       getTabValue(team, 'games_remaining') : 
@@ -988,7 +988,7 @@ const SOSLeaderboard = () => {
                         textAlign: 'center',
                         fontWeight: 'bold',
                         fontSize: '14px',
-                        width: '90px'
+                        width: '60px'
                       }}>
                         <div style={{
                           display: 'flex',
@@ -1166,7 +1166,7 @@ const SOSLeaderboard = () => {
           td:nth-child(3),
           td:nth-child(4),
           td:nth-child(5) {
-            font-size: 11px !important;
+            font-size: 9px !important;
           }
           .difficulty-emojis-mobile {
             display: inline !important;

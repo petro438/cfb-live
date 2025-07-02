@@ -1029,10 +1029,13 @@ const SOSLeaderboard = () => {
                         return getTabValue(team, 'top40_games');
                       } else {
                         // Show record format with total games for overall/played tabs: "0-0 (9)"
-                        const wins = getTabValue(team, 'top40_wins');
-                        const totalGames = getTabValue(team, 'top40_games');
-                        const losses = totalGames - wins;
-                        return `${wins}-${losses} (${totalGames})`;
+                        // Use PLAYED stats for the record, TOTAL for the parentheses
+                        const winsPlayed = getTabValue(team, 'top40_wins_played');
+                        const totalGamesPlayed = getTabValue(team, 'top40_games_played');
+                        const lossesPlayed = totalGamesPlayed - winsPlayed;
+                        const totalGamesScheduled = getTabValue(team, 'top40_games');
+                        
+                        return `${winsPlayed}-${lossesPlayed} (${totalGamesScheduled})`;
                       }
                     })()}
                   </td>

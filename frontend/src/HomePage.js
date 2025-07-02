@@ -26,6 +26,8 @@ const getPercentileColor = (rank, total) => {
   return '#ea4335';
 };
 
+const [sosData, setSosData] = useState([]);
+
 function HomePage() {
   const [sortField, setSortField] = useState('powerRating');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -77,6 +79,32 @@ function HomePage() {
     fetchAvailableSeasons();
   }, [API_URL]);
 
+  useEffect(() => {
+  const fetchSOSData = async () => {
+    try {
+      console.log(`🔍 Fetching SOS data for season: ${selectedSeason}`);
+      const response = await fetch(`${API_URL}/api/leaderboards/strength-of-schedule-fast/${selectedSeason}`);
+      
+      if (!response.ok) {
+        console.warn('SOS data not available for this season');
+        setSosData([]);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log(`📊 SOS data received: ${data.teams?.length || 0} teams`);
+      setSosData(data.teams || []);
+    } catch (err) {
+      console.error('Error fetching SOS data:', err);
+      setSosData([]);
+    }
+  };
+
+  if (selectedSeason) {
+    fetchSOSData();
+  }
+}, [selectedSeason, API_URL]);
+
   // Load database data when season changes
   useEffect(() => {
     const loadDatabaseData = async () => {
@@ -106,24 +134,30 @@ function HomePage() {
         console.log(`📈 Processing ${data.length} teams for ${selectedSeason}`);
         
         // Process the data to match our component structure
-       const processedTeams = data.map(team => ({
-            teamName: team.team_name,
-            powerRating: Number(team.power_rating) || 0,
-            offenseRating: Number(team.offense_rating) || 0,
-            defenseRating: Number(team.defense_rating) || 0,
-            strengthOfSchedule: Number(team.strength_of_schedule) || 0,
-            conference: team.conference || 'Unknown',
-            logo: team.logo_url || team.logo || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
-            abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
-            season: team.season || selectedSeason,
-            // Rankings come pre-calculated from the database
-            powerRank: Number(team.power_rank) || 0,
-            offenseRank: Number(team.offense_rank) || 0,
-            defenseRank: Number(team.defense_rank) || 0,
-            sosRank: Number(team.sos_rank) || 0,
-            // Use the classification from the database directly
-            classification: normalizeClassification(team.classification)
-          }));
+                  const processedTeams = data.map(team => {
+                // Find matching SOS data for this team
+                const sosTeam = sosData.find(s => 
+                  s.team_name === team.team_name || 
+                  s.team === team.team_name
+                );
+                
+                return {
+                  teamName: team.team_name,
+                  powerRating: Number(team.power_rating) || 0,
+                  offenseRating: Number(team.offense_rating) || 0,
+                  defenseRating: Number(team.defense_rating) || 0,
+                  strengthOfSchedule: sosTeam ? Number(sosTeam.sos_overall) : (Number(team.strength_of_schedule) || 0),
+                  sosRank: sosTeam ? Number(sosTeam.sos_rank) : (Number(team.sos_rank) || 0),
+                  conference: team.conference || 'Unknown',
+                  logo: team.logo_url || team.logo || `http://a.espncdn.com/i/teamlogos/ncaa/500/default.png`,
+                  abbreviation: team.abbreviation || team.team_name?.substring(0, 4).toUpperCase(),
+                  season: team.season || selectedSeason,
+                  powerRank: Number(team.power_rank) || 0,
+                  offenseRank: Number(team.offense_rank) || 0,
+                  defenseRank: Number(team.defense_rank) || 0,
+                  classification: normalizeClassification(team.classification)
+                };
+              });
         
         console.log(`✅ Processed teams by classification:`, getClassificationBreakdown(processedTeams));
         
@@ -243,7 +277,7 @@ function HomePage() {
       displayPowerRank: powerSorted.findIndex(t => t.teamName === team.teamName) + 1,
       displayOffenseRank: offenseSorted.findIndex(t => t.teamName === team.teamName) + 1,
       displayDefenseRank: defenseSorted.findIndex(t => t.teamName === team.teamName) + 1,
-      displaySosRank: sosSorted.findIndex(t => t.teamName === team.teamName) + 1,
+      displaySosRank: team.sosRank || sosSorted.findIndex(t => t.teamName === team.teamName) + 1,
       // Keep original ranks for comparison
       nationalPowerRank: team.powerRank,
       nationalOffenseRank: team.offenseRank,
@@ -262,7 +296,7 @@ function HomePage() {
       displayPowerRank: powerSorted.findIndex(t => t.teamName === team.teamName) + 1,
       displayOffenseRank: offenseSorted.findIndex(t => t.teamName === team.teamName) + 1,
       displayDefenseRank: defenseSorted.findIndex(t => t.teamName === team.teamName) + 1,
-      displaySosRank: sosSorted.findIndex(t => t.teamName === team.teamName) + 1,
+      displaySosRank: team.sosRank || sosSorted.findIndex(t => t.teamName === team.teamName) + 1,
       // Keep original ranks for comparison
       nationalPowerRank: team.powerRank,
       nationalOffenseRank: team.offenseRank,
@@ -324,7 +358,7 @@ function HomePage() {
               lineHeight: '1',
               marginBottom: '2px'
             }}>
-              #{rank}
+              {rank}
             </div>
 
             {/* Value - smaller below */}
